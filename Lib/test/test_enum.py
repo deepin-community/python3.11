@@ -1,3 +1,4 @@
+import copy
 import enum
 import doctest
 import inspect
@@ -6,13 +7,14 @@ import pydoc
 import sys
 import unittest
 import threading
+import typing
 import builtins as bltns
 from collections import OrderedDict
 from datetime import date
 from enum import Enum, IntEnum, StrEnum, EnumType, Flag, IntFlag, unique, auto
 from enum import STRICT, CONFORM, EJECT, KEEP, _simple_enum, _test_simple_enum
 from enum import verify, UNIQUE, CONTINUOUS, NAMED_FLAGS, ReprEnum
-from enum import member, nonmember
+from enum import member, nonmember, _iter_bits_lsb
 from io import StringIO
 from pickle import dumps, loads, PicklingError, HIGHEST_PROTOCOL
 from test import support
@@ -64,9 +66,26 @@ try:
     class FlagStooges(Flag):
         LARRY = 1
         CURLY = 2
-        MOE = 3
+        MOE = 4
 except Exception as exc:
     FlagStooges = exc
+
+class FlagStoogesWithZero(Flag):
+    NOFLAG = 0
+    LARRY = 1
+    CURLY = 2
+    MOE = 4
+
+class IntFlagStooges(IntFlag):
+    LARRY = 1
+    CURLY = 2
+    MOE = 4
+
+class IntFlagStoogesWithZero(IntFlag):
+    NOFLAG = 0
+    LARRY = 1
+    CURLY = 2
+    MOE = 4
 
 # for pickle test and subclass tests
 class Name(StrEnum):
@@ -154,6 +173,10 @@ class TestHelpers(unittest.TestCase):
             self.assertTrue(enum._is_private('MyEnum', name), '%r is a not private name?')
         for name in self.sunder_names + self.dunder_names + self.random_names:
             self.assertFalse(enum._is_private('MyEnum', name), '%r is a private name?')
+
+    def test_iter_bits_lsb(self):
+        self.assertEqual(list(_iter_bits_lsb(7)), [1, 2, 4])
+        self.assertRaisesRegex(ValueError, '-8 is not a positive integer', list, _iter_bits_lsb(-8))
 
 
 # for subclassing tests
@@ -732,13 +755,20 @@ class _MinimalOutputTests:
             self.assertFormatIsValue('{:5.2}', TE.third)
             self.assertFormatIsValue('{:f}', TE.third)
 
+    def test_copy(self):
+        TE = self.MainEnum
+        copied = copy.copy(TE)
+        self.assertEqual(copied, TE)
+        deep = copy.deepcopy(TE)
+        self.assertEqual(deep, TE)
+
 
 class _FlagTests:
 
     def test_default_missing_with_wrong_type_value(self):
         with self.assertRaisesRegex(
             ValueError,
-            "'RED' is not a valid TestFlag.Color",
+            "'RED' is not a valid ",
             ) as ctx:
             self.MainEnum('RED')
         self.assertIs(ctx.exception.__context__, None)
@@ -747,7 +777,7 @@ class TestPlainEnum(_EnumTests, _PlainOutputTests, unittest.TestCase):
     enum_type = Enum
 
 
-class TestPlainFlag(_EnumTests, _PlainOutputTests, unittest.TestCase):
+class TestPlainFlag(_EnumTests, _PlainOutputTests, _FlagTests, unittest.TestCase):
     enum_type = Flag
 
 
@@ -759,7 +789,7 @@ class TestStrEnum(_EnumTests, _MinimalOutputTests, unittest.TestCase):
     enum_type = StrEnum
 
 
-class TestIntFlag(_EnumTests, _MinimalOutputTests, unittest.TestCase):
+class TestIntFlag(_EnumTests, _MinimalOutputTests, _FlagTests, unittest.TestCase):
     enum_type = IntFlag
 
 
@@ -771,7 +801,7 @@ class TestMixedStr(_EnumTests, _MixedOutputTests, unittest.TestCase):
     class enum_type(str, Enum): pass
 
 
-class TestMixedIntFlag(_EnumTests, _MixedOutputTests, unittest.TestCase):
+class TestMixedIntFlag(_EnumTests, _MixedOutputTests, _FlagTests, unittest.TestCase):
     class enum_type(int, Flag): pass
 
 
@@ -969,6 +999,15 @@ class TestSpecial(unittest.TestCase):
         class SpamEnum(Enum):
             spam = SpamEnumNotInner
         self.assertEqual(SpamEnum.spam.value, SpamEnumNotInner)
+
+    def test_enum_of_generic_aliases(self):
+        class E(Enum):
+            a = typing.List[int]
+            b = list[int]
+        self.assertEqual(E.a.value, typing.List[int])
+        self.assertEqual(E.b.value, list[int])
+        self.assertEqual(repr(E.a), '<E.a: typing.List[int]>')
+        self.assertEqual(repr(E.b), '<E.b: list[int]>')
 
     @unittest.skipIf(
             python_version >= (3, 13),
@@ -2576,6 +2615,7 @@ class TestSpecial(unittest.TestCase):
         self.assertEqual(Private._Private__corporal, 'Radar')
         self.assertEqual(Private._Private__major_, 'Hoolihan')
 
+    @unittest.skip("Accessing all values retained for performance reasons, see GH-93910")
     def test_exception_for_member_from_member_access(self):
         with self.assertRaisesRegex(AttributeError, "<enum .Di.> member has no attribute .NO."):
             class Di(Enum):
@@ -2617,12 +2657,15 @@ class TestSpecial(unittest.TestCase):
         @dataclass
         class Foo:
             __qualname__ = 'Foo'
-            a: int = 0
+            a: int
         class Entries(Foo, Enum):
-            ENTRY1 = Foo(1)
+            ENTRY1 = 1
+        self.assertTrue(isinstance(Entries.ENTRY1, Foo))
+        self.assertTrue(Entries._member_type_ is Foo, Entries._member_type_)
+        self.assertTrue(Entries.ENTRY1.value == Foo(1), Entries.ENTRY1.value)
         self.assertEqual(repr(Entries.ENTRY1), '<Entries.ENTRY1: Foo(a=1)>')
 
-    def test_repr_with_non_data_type_mixin(self):
+    def test_repr_with_init_data_type_mixin(self):
         # non-data_type is a mixin that doesn't define __new__
         class Foo:
             def __init__(self, a):
@@ -2630,9 +2673,22 @@ class TestSpecial(unittest.TestCase):
             def __repr__(self):
                 return f'Foo(a={self.a!r})'
         class Entries(Foo, Enum):
-            ENTRY1 = Foo(1)
-
+            ENTRY1 = 1
+        #
         self.assertEqual(repr(Entries.ENTRY1), '<Entries.ENTRY1: Foo(a=1)>')
+
+    def test_repr_and_str_with_non_data_type_mixin(self):
+        # non-data_type is a mixin that doesn't define __new__
+        class Foo:
+            def __repr__(self):
+                return 'Foo'
+            def __str__(self):
+                return 'ooF'
+        class Entries(Foo, Enum):
+            ENTRY1 = 1
+        #
+        self.assertEqual(repr(Entries.ENTRY1), 'Foo')
+        self.assertEqual(str(Entries.ENTRY1), 'ooF')
 
     def test_value_backup_assign(self):
         # check that enum will add missing values when custom __new__ does not
@@ -2651,6 +2707,79 @@ class TestSpecial(unittest.TestCase):
             FOUR = 4
         self.assertTrue(isinstance(MyIntFlag.ONE | MyIntFlag.TWO, MyIntFlag), MyIntFlag.ONE | MyIntFlag.TWO)
         self.assertTrue(isinstance(MyIntFlag.ONE | 2, MyIntFlag))
+
+    def test_int_flags_copy(self):
+        class MyIntFlag(IntFlag):
+            ONE = 1
+            TWO = 2
+            FOUR = 4
+
+        flags = MyIntFlag.ONE | MyIntFlag.TWO
+        copied = copy.copy(flags)
+        deep = copy.deepcopy(flags)
+        self.assertEqual(copied, flags)
+        self.assertEqual(deep, flags)
+
+        flags = MyIntFlag.ONE | MyIntFlag.TWO | 8
+        copied = copy.copy(flags)
+        deep = copy.deepcopy(flags)
+        self.assertEqual(copied, flags)
+        self.assertEqual(deep, flags)
+        self.assertEqual(copied.value, 1 | 2 | 8)
+
+    def test_namedtuple_as_value(self):
+        from collections import namedtuple
+        TTuple = namedtuple('TTuple', 'id a blist')
+        class NTEnum(Enum):
+            NONE = TTuple(0, 0, [])
+            A = TTuple(1, 2, [4])
+            B = TTuple(2, 4, [0, 1, 2])
+        self.assertEqual(repr(NTEnum.NONE), "<NTEnum.NONE: TTuple(id=0, a=0, blist=[])>")
+        self.assertEqual(NTEnum.NONE.value, TTuple(id=0, a=0, blist=[]))
+        self.assertEqual(
+                [x.value for x in NTEnum],
+                [TTuple(id=0, a=0, blist=[]), TTuple(id=1, a=2, blist=[4]), TTuple(id=2, a=4, blist=[0, 1, 2])],
+                )
+
+    def test_flag_with_custom_new(self):
+        class FlagFromChar(IntFlag):
+            def __new__(cls, c):
+                value = 1 << c
+                self = int.__new__(cls, value)
+                self._value_ = value
+                return self
+            #
+            a = ord('a')
+        #
+        self.assertEqual(FlagFromChar.a, 158456325028528675187087900672)
+        self.assertEqual(FlagFromChar.a|1, 158456325028528675187087900673)
+        #
+        #
+        class FlagFromChar(Flag):
+            def __new__(cls, c):
+                value = 1 << c
+                self = object.__new__(cls)
+                self._value_ = value
+                return self
+            #
+            a = ord('a')
+            z = 1
+        #
+        self.assertEqual(FlagFromChar.a.value, 158456325028528675187087900672)
+        self.assertEqual((FlagFromChar.a|FlagFromChar.z).value, 158456325028528675187087900674)
+        #
+        #
+        class FlagFromChar(int, Flag, boundary=KEEP):
+            def __new__(cls, c):
+                value = 1 << c
+                self = int.__new__(cls, value)
+                self._value_ = value
+                return self
+            #
+            a = ord('a')
+        #
+        self.assertEqual(FlagFromChar.a, 158456325028528675187087900672)
+        self.assertEqual(FlagFromChar.a|1, 158456325028528675187087900673)
 
 class TestOrder(unittest.TestCase):
     "test usage of the `_order_` attribute"
@@ -2806,7 +2935,7 @@ class OldTestFlag(unittest.TestCase):
             self.assertEqual(bool(f.value), bool(f))
 
     def test_boundary(self):
-        self.assertIs(enum.Flag._boundary_, STRICT)
+        self.assertIs(enum.Flag._boundary_, CONFORM)
         class Iron(Flag, boundary=STRICT):
             ONE = 1
             TWO = 2
@@ -2926,8 +3055,31 @@ class OldTestFlag(unittest.TestCase):
     def test_pickle(self):
         if isinstance(FlagStooges, Exception):
             raise FlagStooges
-        test_pickle_dump_load(self.assertIs, FlagStooges.CURLY|FlagStooges.MOE)
+        test_pickle_dump_load(self.assertIs, FlagStooges.CURLY)
+        test_pickle_dump_load(self.assertEqual,
+                        FlagStooges.CURLY|FlagStooges.MOE)
+        test_pickle_dump_load(self.assertEqual,
+                        FlagStooges.CURLY&~FlagStooges.CURLY)
         test_pickle_dump_load(self.assertIs, FlagStooges)
+
+        test_pickle_dump_load(self.assertIs, FlagStoogesWithZero.CURLY)
+        test_pickle_dump_load(self.assertEqual,
+                        FlagStoogesWithZero.CURLY|FlagStoogesWithZero.MOE)
+        test_pickle_dump_load(self.assertIs, FlagStoogesWithZero.NOFLAG)
+
+        test_pickle_dump_load(self.assertIs, IntFlagStooges.CURLY)
+        test_pickle_dump_load(self.assertEqual,
+                        IntFlagStooges.CURLY|IntFlagStooges.MOE)
+        test_pickle_dump_load(self.assertEqual,
+                        IntFlagStooges.CURLY|IntFlagStooges.MOE|0x30)
+        test_pickle_dump_load(self.assertEqual, IntFlagStooges(0))
+        test_pickle_dump_load(self.assertEqual, IntFlagStooges(0x30))
+        test_pickle_dump_load(self.assertIs, IntFlagStooges)
+
+        test_pickle_dump_load(self.assertIs, IntFlagStoogesWithZero.CURLY)
+        test_pickle_dump_load(self.assertEqual,
+                        IntFlagStoogesWithZero.CURLY|IntFlagStoogesWithZero.MOE)
+        test_pickle_dump_load(self.assertIs, IntFlagStoogesWithZero.NOFLAG)
 
     @unittest.skipIf(
             python_version >= (3, 12),
@@ -3870,6 +4022,16 @@ class TestVerify(unittest.TestCase):
             triple = 3
             value = 4
 
+    def test_negative_alias(self):
+        @verify(NAMED_FLAGS)
+        class Color(Flag):
+            RED = 1
+            GREEN = 2
+            BLUE = 4
+            WHITE = -1
+        # no error means success
+
+
 class TestInternals(unittest.TestCase):
 
     sunder_names = '_bad_', '_good_', '_what_ho_'
@@ -3934,22 +4096,53 @@ class TestInternals(unittest.TestCase):
         self.assertEqual(Color.blue.value, 'blue')
         self.assertEqual(Color.green.value, 'green')
 
-    def test_auto_garbage(self):
-        class Color(Enum):
-            red = 'red'
-            blue = auto()
+    @unittest.skipIf(
+            python_version >= (3, 13),
+            'mixed types with auto() no longer supported',
+            )
+    def test_auto_garbage_ok(self):
+        with self.assertWarnsRegex(DeprecationWarning, 'will require all values to be sortable'):
+            class Color(Enum):
+                red = 'red'
+                blue = auto()
         self.assertEqual(Color.blue.value, 1)
 
-    def test_auto_garbage_corrected(self):
-        class Color(Enum):
-            red = 'red'
-            blue = 2
-            green = auto()
+    @unittest.skipIf(
+            python_version >= (3, 13),
+            'mixed types with auto() no longer supported',
+            )
+    def test_auto_garbage_corrected_ok(self):
+        with self.assertWarnsRegex(DeprecationWarning, 'will require all values to be sortable'):
+            class Color(Enum):
+                red = 'red'
+                blue = 2
+                green = auto()
 
         self.assertEqual(list(Color), [Color.red, Color.blue, Color.green])
         self.assertEqual(Color.red.value, 'red')
         self.assertEqual(Color.blue.value, 2)
         self.assertEqual(Color.green.value, 3)
+
+    @unittest.skipIf(
+            python_version < (3, 13),
+            'mixed types with auto() will raise in 3.13',
+            )
+    def test_auto_garbage_fail(self):
+        with self.assertRaisesRegex(TypeError, 'will require all values to be sortable'):
+            class Color(Enum):
+                red = 'red'
+                blue = auto()
+
+    @unittest.skipIf(
+            python_version < (3, 13),
+            'mixed types with auto() will raise in 3.13',
+            )
+    def test_auto_garbage_corrected_fail(self):
+        with self.assertRaisesRegex(TypeError, 'will require all values to be sortable'):
+            class Color(Enum):
+                red = 'red'
+                blue = 2
+                green = auto()
 
     def test_auto_order(self):
         with self.assertRaises(TypeError):
@@ -3972,12 +4165,72 @@ class TestInternals(unittest.TestCase):
         self.assertEqual(Color.red.value, 'pathological case')
         self.assertEqual(Color.blue.value, 'blue')
 
+    @unittest.skipIf(
+            python_version < (3, 13),
+            'auto() will return highest value + 1 in 3.13',
+            )
+    def test_auto_with_aliases(self):
+        class Color(Enum):
+            red = auto()
+            blue = auto()
+            oxford = blue
+            crimson = red
+            green = auto()
+        self.assertIs(Color.crimson, Color.red)
+        self.assertIs(Color.oxford, Color.blue)
+        self.assertIsNot(Color.green, Color.red)
+        self.assertIsNot(Color.green, Color.blue)
+
     def test_duplicate_auto(self):
         class Dupes(Enum):
             first = primero = auto()
             second = auto()
             third = auto()
         self.assertEqual([Dupes.first, Dupes.second, Dupes.third], list(Dupes))
+
+    def test_multiple_auto_on_line(self):
+        class Huh(Enum):
+            ONE = auto()
+            TWO = auto(), auto()
+            THREE = auto(), auto(), auto()
+        self.assertEqual(Huh.ONE.value, 1)
+        self.assertEqual(Huh.TWO.value, (2, 3))
+        self.assertEqual(Huh.THREE.value, (4, 5, 6))
+        #
+        class Hah(Enum):
+            def __new__(cls, value, abbr=None):
+                member = object.__new__(cls)
+                member._value_ = value
+                member.abbr = abbr or value[:3].lower()
+                return member
+            def _generate_next_value_(name, start, count, last):
+                return name
+            #
+            MONDAY = auto()
+            TUESDAY = auto()
+            WEDNESDAY = auto(), 'WED'
+            THURSDAY = auto(), 'Thu'
+            FRIDAY = auto()
+        self.assertEqual(Hah.MONDAY.value, 'MONDAY')
+        self.assertEqual(Hah.MONDAY.abbr, 'mon')
+        self.assertEqual(Hah.TUESDAY.value, 'TUESDAY')
+        self.assertEqual(Hah.TUESDAY.abbr, 'tue')
+        self.assertEqual(Hah.WEDNESDAY.value, 'WEDNESDAY')
+        self.assertEqual(Hah.WEDNESDAY.abbr, 'WED')
+        self.assertEqual(Hah.THURSDAY.value, 'THURSDAY')
+        self.assertEqual(Hah.THURSDAY.abbr, 'Thu')
+        self.assertEqual(Hah.FRIDAY.value, 'FRIDAY')
+        self.assertEqual(Hah.FRIDAY.abbr, 'fri')
+        #
+        class Huh(Enum):
+            def _generate_next_value_(name, start, count, last):
+                return count+1
+            ONE = auto()
+            TWO = auto(), auto()
+            THREE = auto(), auto(), auto()
+        self.assertEqual(Huh.ONE.value, 1)
+        self.assertEqual(Huh.TWO.value, (2, 2))
+        self.assertEqual(Huh.THREE.value, (3, 3, 3))
 
 class TestEnumTypeSubclassing(unittest.TestCase):
     pass
@@ -3987,36 +4240,6 @@ Help on class Color in module %s:
 
 class Color(enum.Enum)
  |  Color(value, names=None, *, module=None, qualname=None, type=None, start=1, boundary=None)
- |\x20\x20
- |  A collection of name/value pairs.
- |\x20\x20
- |  Access them by:
- |\x20\x20
- |  - attribute access::
- |\x20\x20
- |  >>> Color.CYAN
- |  <Color.CYAN: 1>
- |\x20\x20
- |  - value lookup:
- |\x20\x20
- |  >>> Color(1)
- |  <Color.CYAN: 1>
- |\x20\x20
- |  - name lookup:
- |\x20\x20
- |  >>> Color['CYAN']
- |  <Color.CYAN: 1>
- |\x20\x20
- |  Enumerations can be iterated over, and know how many members they have:
- |\x20\x20
- |  >>> len(Color)
- |  3
- |\x20\x20
- |  >>> list(Color)
- |  [<Color.CYAN: 1>, <Color.MAGENTA: 2>, <Color.YELLOW: 3>]
- |\x20\x20
- |  Methods can be added to enumerations, and members can have their own
- |  attributes -- see the documentation for details.
  |\x20\x20
  |  Method resolution order:
  |      Color
@@ -4225,10 +4448,16 @@ class TestStdLib(unittest.TestCase):
             CYAN = 1
             MAGENTA = 2
             YELLOW = 3
+            @bltns.property
+            def zeroth(self):
+                return 'zeroed %s' % self.name
         class CheckedColor(Enum):
             CYAN = 1
             MAGENTA = 2
             YELLOW = 3
+            @bltns.property
+            def zeroth(self):
+                return 'zeroed %s' % self.name
         self.assertTrue(_test_simple_enum(CheckedColor, SimpleColor) is None)
         SimpleColor.MAGENTA._value_ = 9
         self.assertRaisesRegex(
@@ -4263,77 +4492,13 @@ class MiscTestCase(unittest.TestCase):
     def test_doc_1(self):
         class Single(Enum):
             ONE = 1
-        self.assertEqual(
-                Single.__doc__,
-                dedent("""\
-                    A collection of name/value pairs.
-
-                    Access them by:
-
-                    - attribute access::
-
-                    >>> Single.ONE
-                    <Single.ONE: 1>
-
-                    - value lookup:
-
-                    >>> Single(1)
-                    <Single.ONE: 1>
-
-                    - name lookup:
-
-                    >>> Single['ONE']
-                    <Single.ONE: 1>
-
-                    Enumerations can be iterated over, and know how many members they have:
-
-                    >>> len(Single)
-                    1
-
-                    >>> list(Single)
-                    [<Single.ONE: 1>]
-
-                    Methods can be added to enumerations, and members can have their own
-                    attributes -- see the documentation for details.
-                    """))
+        self.assertEqual(Single.__doc__, None)
 
     def test_doc_2(self):
         class Double(Enum):
             ONE = 1
             TWO = 2
-        self.assertEqual(
-                Double.__doc__,
-                dedent("""\
-                    A collection of name/value pairs.
-
-                    Access them by:
-
-                    - attribute access::
-
-                    >>> Double.ONE
-                    <Double.ONE: 1>
-
-                    - value lookup:
-
-                    >>> Double(1)
-                    <Double.ONE: 1>
-
-                    - name lookup:
-
-                    >>> Double['ONE']
-                    <Double.ONE: 1>
-
-                    Enumerations can be iterated over, and know how many members they have:
-
-                    >>> len(Double)
-                    2
-
-                    >>> list(Double)
-                    [<Double.ONE: 1>, <Double.TWO: 2>]
-
-                    Methods can be added to enumerations, and members can have their own
-                    attributes -- see the documentation for details.
-                    """))
+        self.assertEqual(Double.__doc__, None)
 
 
     def test_doc_1(self):
@@ -4341,39 +4506,7 @@ class MiscTestCase(unittest.TestCase):
             ONE = 1
             TWO = 2
             THREE = 3
-        self.assertEqual(
-                Triple.__doc__,
-                dedent("""\
-                    A collection of name/value pairs.
-
-                    Access them by:
-
-                    - attribute access::
-
-                    >>> Triple.ONE
-                    <Triple.ONE: 1>
-
-                    - value lookup:
-
-                    >>> Triple(1)
-                    <Triple.ONE: 1>
-
-                    - name lookup:
-
-                    >>> Triple['ONE']
-                    <Triple.ONE: 1>
-
-                    Enumerations can be iterated over, and know how many members they have:
-
-                    >>> len(Triple)
-                    3
-
-                    >>> list(Triple)
-                    [<Triple.ONE: 1>, <Triple.TWO: 2>, <Triple.THREE: 3>]
-
-                    Methods can be added to enumerations, and members can have their own
-                    attributes -- see the documentation for details.
-                    """))
+        self.assertEqual(Triple.__doc__, None)
 
     def test_doc_1(self):
         class Quadruple(Enum):
@@ -4381,39 +4514,7 @@ class MiscTestCase(unittest.TestCase):
             TWO = 2
             THREE = 3
             FOUR = 4
-        self.assertEqual(
-                Quadruple.__doc__,
-                dedent("""\
-                    A collection of name/value pairs.
-
-                    Access them by:
-
-                    - attribute access::
-
-                    >>> Quadruple.ONE
-                    <Quadruple.ONE: 1>
-
-                    - value lookup:
-
-                    >>> Quadruple(1)
-                    <Quadruple.ONE: 1>
-
-                    - name lookup:
-
-                    >>> Quadruple['ONE']
-                    <Quadruple.ONE: 1>
-
-                    Enumerations can be iterated over, and know how many members they have:
-
-                    >>> len(Quadruple)
-                    4
-
-                    >>> list(Quadruple)[:3]
-                    [<Quadruple.ONE: 1>, <Quadruple.TWO: 2>, <Quadruple.THREE: 3>]
-
-                    Methods can be added to enumerations, and members can have their own
-                    attributes -- see the documentation for details.
-                    """))
+        self.assertEqual(Quadruple.__doc__, None)
 
 
 # These are unordered here on purpose to ensure that declaration order

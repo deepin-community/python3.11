@@ -7,7 +7,9 @@
 #if defined(__APPLE__) || defined(HAVE_PTHREAD_DESTRUCTOR)
 #define destructor xxdestructor
 #endif
-#include <pthread.h>
+#ifndef HAVE_PTHREAD_STUBS
+#  include <pthread.h>
+#endif
 #if defined(__APPLE__) || defined(HAVE_PTHREAD_DESTRUCTOR)
 #undef destructor
 #endif
@@ -506,7 +508,7 @@ PyThread_acquire_lock_timed(PyThread_type_lock lock, PY_TIMEOUT_T microseconds,
 #ifndef HAVE_SEM_CLOCKWAIT
         if (timeout > 0) {
             /* wait interrupted by a signal (EINTR): recompute the timeout */
-            _PyTime_t timeout = _PyDeadline_Get(deadline);
+            timeout = _PyDeadline_Get(deadline);
             if (timeout < 0) {
                 status = ETIMEDOUT;
                 break;

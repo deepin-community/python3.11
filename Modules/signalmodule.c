@@ -189,8 +189,8 @@ compare_handler(PyObject *func, PyObject *dfl_ign_handler)
     return PyObject_RichCompareBool(func, dfl_ign_handler, Py_EQ) == 1;
 }
 
-#ifdef HAVE_GETITIMER
-/* auxiliary functions for setitimer */
+#ifdef HAVE_SETITIMER
+/* auxiliary function for setitimer */
 static int
 timeval_from_double(PyObject *obj, struct timeval *tv)
 {
@@ -206,7 +206,10 @@ timeval_from_double(PyObject *obj, struct timeval *tv)
     }
     return _PyTime_AsTimeval(t, tv, _PyTime_ROUND_CEILING);
 }
+#endif
 
+#if defined(HAVE_SETITIMER) || defined(HAVE_GETITIMER)
+/* auxiliary functions for get/setitimer */
 Py_LOCAL_INLINE(double)
 double_from_timeval(struct timeval *tv)
 {
@@ -624,13 +627,14 @@ signal.strsignal
 
 Return the system description of the given signal.
 
-The return values can be such as "Interrupt", "Segmentation fault", etc.
-Returns None if the signal is not recognized.
+Returns the description of signal *signalnum*, such as "Interrupt"
+for :const:`SIGINT`. Returns :const:`None` if *signalnum* has no
+description. Raises :exc:`ValueError` if *signalnum* is invalid.
 [clinic start generated code]*/
 
 static PyObject *
 signal_strsignal_impl(PyObject *module, int signalnum)
-/*[clinic end generated code: output=44e12e1e3b666261 input=b77914b03f856c74]*/
+/*[clinic end generated code: output=44e12e1e3b666261 input=238b335847778bc0]*/
 {
     const char *res;
 
@@ -1829,6 +1833,9 @@ _PyErr_CheckSignalsTstate(PyThreadState *tstate)
     _Py_atomic_store(&is_tripped, 0);
 
     _PyInterpreterFrame *frame = tstate->cframe->current_frame;
+    while (frame && _PyFrame_IsIncomplete(frame)) {
+        frame = frame->previous;
+    }
     signal_state_t *state = &signal_global_state;
     for (int i = 1; i < Py_NSIG; i++) {
         if (!_Py_atomic_load_relaxed(&Handlers[i].tripped)) {

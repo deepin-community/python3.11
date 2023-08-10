@@ -45,8 +45,8 @@ Number-theoretic and representation functions
    to zero when ``k > n``.
 
    Also called the binomial coefficient because it is equivalent
-   to the coefficient of k-th term in polynomial expansion of the
-   expression ``(1 + x) ** n``.
+   to the coefficient of k-th term in polynomial expansion of
+   ``(1 + x)ⁿ``.
 
    Raises :exc:`TypeError` if either of the arguments are not integers.
    Raises :exc:`ValueError` if either of the arguments are negative.
@@ -578,7 +578,7 @@ Special functions
 
    The :func:`erf` function can be used to compute traditional statistical
    functions such as the `cumulative standard normal distribution
-   <https://en.wikipedia.org/wiki/Normal_distribution#Cumulative_distribution_function>`_::
+   <https://en.wikipedia.org/wiki/Normal_distribution#Cumulative_distribution_functions>`_::
 
      def phi(x):
          'Cumulative distribution function for the standard normal distribution'

@@ -10,7 +10,6 @@
 #endif
 
 #include "pycore_call.h"          // _PyObject_CallNoArgs()
-#include "frameobject.h"
 
 #include <stdbool.h>
 
@@ -277,15 +276,14 @@ static void _CallPythonObject(void *mem,
                                       "of ctypes callback function",
                                       callable);
         }
-        else if (keep == Py_None) {
-            /* Nothing to keep */
-            Py_DECREF(keep);
-        }
         else if (setfunc != _ctypes_get_fielddesc("O")->setfunc) {
-            if (-1 == PyErr_WarnEx(PyExc_RuntimeWarning,
-                                   "memory leak in callback function.",
-                                   1))
-            {
+            if (keep == Py_None) {
+                /* Nothing to keep */
+                Py_DECREF(keep);
+            }
+            else if (PyErr_WarnEx(PyExc_RuntimeWarning,
+                                  "memory leak in callback function.",
+                                  1) == -1) {
                 _PyErr_WriteUnraisableMsg("on converting result "
                                           "of ctypes callback function",
                                           callable);
@@ -406,9 +404,15 @@ CThunkObject *_ctypes_alloc_callback(PyObject *callable,
                      "ffi_prep_cif failed with %d", result);
         goto error;
     }
+
+
 #if HAVE_FFI_PREP_CLOSURE_LOC
 #   ifdef USING_APPLE_OS_LIBFFI
+#    ifdef HAVE_BUILTIN_AVAILABLE
 #      define HAVE_FFI_PREP_CLOSURE_LOC_RUNTIME __builtin_available(macos 10.15, ios 13, watchos 6, tvos 13, *)
+#    else
+#      define HAVE_FFI_PREP_CLOSURE_LOC_RUNTIME (ffi_prep_closure_loc != NULL)
+#    endif
 #   else
 #      define HAVE_FFI_PREP_CLOSURE_LOC_RUNTIME 1
 #   endif

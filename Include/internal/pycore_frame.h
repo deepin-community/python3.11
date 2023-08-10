@@ -94,7 +94,10 @@ static inline void _PyFrame_StackPush(_PyInterpreterFrame *f, PyObject *value) {
 
 void _PyFrame_Copy(_PyInterpreterFrame *src, _PyInterpreterFrame *dest);
 
-/* Consumes reference to func */
+/* Consumes reference to func and locals.
+   Does not initialize frame->previous, which happens
+   when frame is linked into the frame stack.
+ */
 static inline void
 _PyFrame_InitializeSpecials(
     _PyInterpreterFrame *frame, PyFunctionObject *func,
@@ -133,6 +136,21 @@ _PyFrame_SetStackPointer(_PyInterpreterFrame *frame, PyObject **stack_pointer)
     frame->stacktop = (int)(stack_pointer - frame->localsplus);
 }
 
+/* Determine whether a frame is incomplete.
+ * A frame is incomplete if it is part way through
+ * creating cell objects or a generator or coroutine.
+ *
+ * Frames on the frame stack are incomplete until the
+ * first RESUME instruction.
+ * Frames owned by a generator are always complete.
+ */
+static inline bool
+_PyFrame_IsIncomplete(_PyInterpreterFrame *frame)
+{
+    return frame->owner != FRAME_OWNED_BY_GENERATOR &&
+    frame->prev_instr < _PyCode_CODE(frame->f_code) + frame->f_code->_co_firsttraceable;
+}
+
 /* For use by _PyFrame_GetFrameObject
   Do not call directly. */
 PyFrameObject *
@@ -144,6 +162,8 @@ _PyFrame_MakeAndSetFrameObject(_PyInterpreterFrame *frame);
 static inline PyFrameObject *
 _PyFrame_GetFrameObject(_PyInterpreterFrame *frame)
 {
+
+    assert(!_PyFrame_IsIncomplete(frame));
     PyFrameObject *res =  frame->frame_obj;
     if (res != NULL) {
         return res;
@@ -175,17 +195,25 @@ _PyFrame_LocalsToFast(_PyInterpreterFrame *frame, int clear);
 extern _PyInterpreterFrame *
 _PyThreadState_BumpFramePointerSlow(PyThreadState *tstate, size_t size);
 
+static inline bool
+_PyThreadState_HasStackSpace(PyThreadState *tstate, size_t size)
+{
+    assert(
+        (tstate->datastack_top == NULL && tstate->datastack_limit == NULL)
+        ||
+        (tstate->datastack_top != NULL && tstate->datastack_limit != NULL)
+    );
+    return tstate->datastack_top != NULL &&
+        size < (size_t)(tstate->datastack_limit - tstate->datastack_top);
+}
+
 static inline _PyInterpreterFrame *
 _PyThreadState_BumpFramePointer(PyThreadState *tstate, size_t size)
 {
-    PyObject **base = tstate->datastack_top;
-    if (base) {
-        PyObject **top = base + size;
-        assert(tstate->datastack_limit);
-        if (top < tstate->datastack_limit) {
-            tstate->datastack_top = top;
-            return (_PyInterpreterFrame *)base;
-        }
+    if (_PyThreadState_HasStackSpace(tstate, size)) {
+        _PyInterpreterFrame *res = (_PyInterpreterFrame *)tstate->datastack_top;
+        tstate->datastack_top += size;
+        return res;
     }
     return _PyThreadState_BumpFramePointerSlow(tstate, size);
 }

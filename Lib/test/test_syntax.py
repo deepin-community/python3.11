@@ -607,7 +607,7 @@ SyntaxError: Generator expression must be parenthesized
 >>> class C(x for x in L):
 ...     pass
 Traceback (most recent call last):
-SyntaxError: expected ':'
+SyntaxError: invalid syntax
 
 >>> def g(*args, **kwargs):
 ...     print(args, sorted(kwargs.items()))
@@ -963,17 +963,22 @@ leading to spurious errors.
      ...
    SyntaxError: cannot assign to function call here. Maybe you meant '==' instead of '='?
 
-    Missing ':' before suites:
+Missing ':' before suites:
 
-    >>> def f()
-    ...     pass
-    Traceback (most recent call last):
-    SyntaxError: expected ':'
+   >>> def f()
+   ...     pass
+   Traceback (most recent call last):
+   SyntaxError: expected ':'
 
-    >>> class A
-    ...     pass
-    Traceback (most recent call last):
-    SyntaxError: expected ':'
+   >>> class A
+   ...     pass
+   Traceback (most recent call last):
+   SyntaxError: expected ':'
+
+   >>> class R&D:
+   ...     pass
+   Traceback (most recent call last):
+   SyntaxError: invalid syntax
 
    >>> if 1
    ...   pass
@@ -1006,6 +1011,11 @@ leading to spurious errors.
    ...   pass
    Traceback (most recent call last):
    SyntaxError: expected ':'
+
+   >>> for x in range 10:
+   ...   pass
+   Traceback (most recent call last):
+   SyntaxError: invalid syntax
 
    >>> while True
    ...   pass
@@ -1052,6 +1062,11 @@ leading to spurious errors.
    Traceback (most recent call last):
    SyntaxError: expected ':'
 
+   >>> with block ad something:
+   ...   pass
+   Traceback (most recent call last):
+   SyntaxError: invalid syntax
+
    >>> try
    ...   pass
    Traceback (most recent call last):
@@ -1069,6 +1084,12 @@ leading to spurious errors.
    ...       pass
    Traceback (most recent call last):
    SyntaxError: expected ':'
+
+   >>> match x x:
+   ...   case list():
+   ...       pass
+   Traceback (most recent call last):
+   SyntaxError: invalid syntax
 
    >>> match x:
    ...   case list()
@@ -1244,9 +1265,19 @@ Incomplete dictionary literals
    Traceback (most recent call last):
    SyntaxError: expression expected after dictionary key and ':'
 
-   # Ensure that the error is not raise for syntax errors that happen after sets
+   # Ensure that the error is not raised for syntax errors that happen after sets
 
    >>> {1} $
+   Traceback (most recent call last):
+   SyntaxError: invalid syntax
+
+   # Ensure that the error is not raised for invalid expressions
+
+   >>> {1: 2, 3: foo(,), 4: 5}
+   Traceback (most recent call last):
+   SyntaxError: invalid syntax
+
+   >>> {1: $, 2: 3}
    Traceback (most recent call last):
    SyntaxError: invalid syntax
 
@@ -1876,9 +1907,6 @@ class SyntaxTestCase(unittest.TestCase):
             """
         self._check_error(source, "parameter and nonlocal", lineno=3)
 
-    def test_break_outside_loop(self):
-        self._check_error("break", "outside loop")
-
     def test_yield_outside_function(self):
         self._check_error("if 0: yield",                "outside function")
         self._check_error("if 0: yield\nelse:  x=1",    "outside function")
@@ -1907,20 +1935,27 @@ class SyntaxTestCase(unittest.TestCase):
                           "outside function")
 
     def test_break_outside_loop(self):
-        self._check_error("if 0: break",             "outside loop")
-        self._check_error("if 0: break\nelse:  x=1",  "outside loop")
-        self._check_error("if 1: pass\nelse: break", "outside loop")
-        self._check_error("class C:\n  if 0: break", "outside loop")
+        msg = "outside loop"
+        self._check_error("break", msg, lineno=1)
+        self._check_error("if 0: break", msg, lineno=1)
+        self._check_error("if 0: break\nelse:  x=1", msg, lineno=1)
+        self._check_error("if 1: pass\nelse: break", msg, lineno=2)
+        self._check_error("class C:\n  if 0: break", msg, lineno=2)
         self._check_error("class C:\n  if 1: pass\n  else: break",
-                          "outside loop")
+                          msg, lineno=3)
+        self._check_error("with object() as obj:\n break",
+                          msg, lineno=2)
 
     def test_continue_outside_loop(self):
-        self._check_error("if 0: continue",             "not properly in loop")
-        self._check_error("if 0: continue\nelse:  x=1", "not properly in loop")
-        self._check_error("if 1: pass\nelse: continue", "not properly in loop")
-        self._check_error("class C:\n  if 0: continue", "not properly in loop")
+        msg = "not properly in loop"
+        self._check_error("if 0: continue", msg, lineno=1)
+        self._check_error("if 0: continue\nelse:  x=1", msg, lineno=1)
+        self._check_error("if 1: pass\nelse: continue", msg, lineno=2)
+        self._check_error("class C:\n  if 0: continue", msg, lineno=2)
         self._check_error("class C:\n  if 1: pass\n  else: continue",
-                          "not properly in loop")
+                          msg, lineno=3)
+        self._check_error("with object() as obj:\n    continue",
+                          msg, lineno=2)
 
     def test_unexpected_indent(self):
         self._check_error("foo()\n bar()\n", "unexpected indent",
@@ -1954,6 +1989,16 @@ class SyntaxTestCase(unittest.TestCase):
                           "Generator expression must be parenthesized",
                           lineno=1, end_lineno=1, offset=11, end_offset=53)
 
+    def test_except_then_except_star(self):
+        self._check_error("try: pass\nexcept ValueError: pass\nexcept* TypeError: pass",
+                          r"cannot have both 'except' and 'except\*' on the same 'try'",
+                          lineno=3, end_lineno=3, offset=1, end_offset=8)
+
+    def test_except_star_then_except(self):
+        self._check_error("try: pass\nexcept* ValueError: pass\nexcept TypeError: pass",
+                          r"cannot have both 'except' and 'except\*' on the same 'try'",
+                          lineno=3, end_lineno=3, offset=1, end_offset=7)
+
     def test_empty_line_after_linecont(self):
         # See issue-40847
         s = r"""\
@@ -1981,7 +2026,8 @@ def fib(n):
     a, b = 0, 1
 """
         try:
-            self.assertEqual(compile(s1, '<string>', 'exec'), compile(s2, '<string>', 'exec'))
+            compile(s1, '<string>', 'exec')
+            compile(s2, '<string>', 'exec')
         except SyntaxError:
             self.fail("Indented statement over multiple lines is valid")
 
@@ -2052,6 +2098,22 @@ def func2():
 
         for paren in ")]}":
             self._check_error(paren + "1 + 2", f"unmatched '\\{paren}'")
+
+        # Some more complex examples:
+        code = """\
+func(
+    a=["unclosed], # Need a quote in this comment: "
+    b=2,
+)
+"""
+        self._check_error(code, "parenthesis '\\)' does not match opening parenthesis '\\['")
+
+    def test_error_string_literal(self):
+
+        self._check_error("'blech", "unterminated string literal")
+        self._check_error('"blech', "unterminated string literal")
+        self._check_error("'''blech", "unterminated triple-quoted string literal")
+        self._check_error('"""blech', "unterminated triple-quoted string literal")
 
     def test_invisible_characters(self):
         self._check_error('print\x17("Hello")', "invalid non-printable character")

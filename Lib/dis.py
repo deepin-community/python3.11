@@ -392,7 +392,7 @@ def _get_name_info(name_index, get_name, **extrainfo):
     else:
         return UNKNOWN, ''
 
-def parse_varint(iterator):
+def _parse_varint(iterator):
     b = next(iterator)
     val = b & 63
     while b&64:
@@ -401,16 +401,16 @@ def parse_varint(iterator):
         val |= b&63
     return val
 
-def parse_exception_table(code):
+def _parse_exception_table(code):
     iterator = iter(code.co_exceptiontable)
     entries = []
     try:
         while True:
-            start = parse_varint(iterator)*2
-            length = parse_varint(iterator)*2
+            start = _parse_varint(iterator)*2
+            length = _parse_varint(iterator)*2
             end = start + length
-            target = parse_varint(iterator)*2
-            dl = parse_varint(iterator)
+            target = _parse_varint(iterator)*2
+            dl = _parse_varint(iterator)
             depth = dl >> 1
             lasti = bool(dl&1)
             entries.append(_ExceptionTableEntry(start, end, target, depth, lasti))
@@ -492,22 +492,34 @@ def _get_instructions_bytes(code, varname_from_oparg=None,
         yield Instruction(_all_opname[op], op,
                           arg, argval, argrepr,
                           offset, starts_line, is_jump_target, positions)
-        if show_caches and _inline_cache_entries[deop]:
-            for name, caches in _cache_format[opname[deop]].items():
-                data = code[offset + 2: offset + 2 + caches * 2]
-                argrepr = f"{name}: {int.from_bytes(data, sys.byteorder)}"
-                for _ in range(caches):
-                    offset += 2
-                    yield Instruction(
-                        "CACHE", 0, 0, None, argrepr, offset, None, False, None
-                    )
-                    # Only show the actual value for the first cache entry:
+        caches = _inline_cache_entries[deop]
+        if not caches:
+            continue
+        if not show_caches:
+            # We still need to advance the co_positions iterator:
+            for _ in range(caches):
+                next(co_positions, ())
+            continue
+        for name, size in _cache_format[opname[deop]].items():
+            for i in range(size):
+                offset += 2
+                # Only show the fancy argrepr for a CACHE instruction when it's
+                # the first entry for a particular cache value and the
+                # instruction using it is actually quickened:
+                if i == 0 and op != deop:
+                    data = code[offset: offset + 2 * size]
+                    argrepr = f"{name}: {int.from_bytes(data, sys.byteorder)}"
+                else:
                     argrepr = ""
+                yield Instruction(
+                    "CACHE", CACHE, 0, None, argrepr, offset, None, False,
+                    Positions(*next(co_positions, ()))
+                )
 
 def disassemble(co, lasti=-1, *, file=None, show_caches=False, adaptive=False):
     """Disassemble a code object."""
     linestarts = dict(findlinestarts(co))
-    exception_entries = parse_exception_table(co)
+    exception_entries = _parse_exception_table(co)
     _disassemble_bytes(_get_code_array(co, adaptive),
                        lasti, co._varname_from_oparg,
                        co.co_names, co.co_consts, linestarts, file=file,
@@ -592,7 +604,7 @@ def _unpack_opargs(code):
         caches = _inline_cache_entries[deop]
         if deop >= HAVE_ARGUMENT:
             arg = code[i+1] | extended_arg
-            extended_arg = (arg << 8) if op == EXTENDED_ARG else 0
+            extended_arg = (arg << 8) if deop == EXTENDED_ARG else 0
             # The oparg is stored as a signed integer
             # If the value exceeds its upper limit, it will overflow and wrap
             # to a negative integer
@@ -694,7 +706,7 @@ class Bytecode:
         self._linestarts = dict(findlinestarts(co))
         self._original_object = x
         self.current_offset = current_offset
-        self.exception_entries = parse_exception_table(co)
+        self.exception_entries = _parse_exception_table(co)
         self.show_caches = show_caches
         self.adaptive = adaptive
 

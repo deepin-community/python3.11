@@ -589,8 +589,8 @@ Supported operations:
 +-------------------------------+----------------------------------------------+
 | Operation                     | Result                                       |
 +===============================+==============================================+
-| ``date2 = date1 + timedelta`` | *date2* is ``timedelta.days`` days removed   |
-|                               | from *date1*. (1)                            |
+| ``date2 = date1 + timedelta`` | *date2* will be ``timedelta.days`` days      |
+|                               | after *date1*. (1)                           |
 +-------------------------------+----------------------------------------------+
 | ``date2 = date1 - timedelta`` | Computes *date2* such that ``date2 +         |
 |                               | timedelta == date1``. (2)                    |
@@ -1350,7 +1350,7 @@ Instance methods:
 
       Because naive ``datetime`` objects are treated by many ``datetime`` methods
       as local times, it is preferred to use aware datetimes to represent times
-      in UTC; as a result, using ``utcfromtimetuple`` may give misleading
+      in UTC; as a result, using :meth:`datetime.utctimetuple` may give misleading
       results. If you have a naive ``datetime`` representing UTC, use
       ``datetime.replace(tzinfo=timezone.utc)`` to make it aware, at which point
       you can use :meth:`.datetime.timetuple`.
@@ -1769,7 +1769,7 @@ Other constructor:
    ISO 8601 format, with the following exceptions:
 
    1. Time zone offsets may have fractional seconds.
-   2. The leading `T`, normally required in cases where there may be ambiguity between
+   2. The leading ``T``, normally required in cases where there may be ambiguity between
       a date and a time, is not required.
    3. Fractional seconds may have any number of digits (anything beyond 6 will
       be truncated).
@@ -2265,7 +2265,7 @@ where historical changes have been made to civil time.
   two digits of ``offset.hours`` and ``offset.minutes`` respectively.
 
   .. versionchanged:: 3.6
-     Name generated from ``offset=timedelta(0)`` is now plain `'UTC'`, not
+     Name generated from ``offset=timedelta(0)`` is now plain ``'UTC'``, not
      ``'UTC+00:00'``.
 
 
@@ -2589,7 +2589,7 @@ Notes:
 
 (9)
    When used with the :meth:`strptime` method, the leading zero is optional
-   for  formats ``%d``, ``%m``, ``%H``, ``%I``, ``%M``, ``%S``, ``%J``, ``%U``,
+   for  formats ``%d``, ``%m``, ``%H``, ``%I``, ``%M``, ``%S``, ``%j``, ``%U``,
    ``%W``, and ``%V``. Format ``%y`` does require a leading zero.
 
 .. rubric:: Footnotes
@@ -2603,7 +2603,7 @@ Notes:
        many other calendar systems.
 
 .. [#] See R. H. van Gent's `guide to the mathematics of the ISO 8601 calendar
-       <https://www.staff.science.uu.nl/~gent0113/calendar/isocalendar.htm>`_
+       <https://web.archive.org/web/20220531051136/https://webspace.science.uu.nl/~gent0113/calendar/isocalendar.htm>`_
        for a good explanation.
 
 .. [#] Passing ``datetime.strptime('Feb 29', '%b %d')`` will fail since ``1900`` is not a leap year.

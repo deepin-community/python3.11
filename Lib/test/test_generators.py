@@ -170,6 +170,62 @@ class GeneratorTest(unittest.TestCase):
             g.send(0)
         self.assertEqual(next(g), 1)
 
+    def test_handle_frame_object_in_creation(self):
+
+        #Attempt to expose partially constructed frames
+        #See https://github.com/python/cpython/issues/94262
+
+        def cb(*args):
+            inspect.stack()
+
+        def gen():
+            yield 1
+
+        thresholds = gc.get_threshold()
+
+        gc.callbacks.append(cb)
+        gc.set_threshold(1, 0, 0)
+        try:
+            gen()
+        finally:
+            gc.set_threshold(*thresholds)
+            gc.callbacks.pop()
+
+        class Sneaky:
+            def __del__(self):
+                inspect.stack()
+
+        sneaky = Sneaky()
+        sneaky._s = Sneaky()
+        sneaky._s._s = sneaky
+
+        gc.set_threshold(1, 0, 0)
+        try:
+            del sneaky
+            gen()
+        finally:
+            gc.set_threshold(*thresholds)
+
+    def test_ag_frame_f_back(self):
+        async def f():
+            yield
+        ag = f()
+        self.assertIsNone(ag.ag_frame.f_back)
+
+    def test_cr_frame_f_back(self):
+        async def f():
+            pass
+        cr = f()
+        self.assertIsNone(cr.cr_frame.f_back)
+        cr.close()  # Suppress RuntimeWarning.
+
+    def test_gi_frame_f_back(self):
+        def f():
+            yield
+        gi = f()
+        self.assertIsNone(gi.gi_frame.f_back)
+
+
 
 class ExceptionTest(unittest.TestCase):
     # Tests for the issue #23353: check that the currently handled exception

@@ -33,6 +33,7 @@ probably additional platforms, as long as OpenSSL is installed on that platform.
    may lead to a false sense of security, as the default settings of the
    ssl module are not necessarily appropriate for your application.
 
+.. include:: ../includes/wasm-notavail.rst
 
 This section documents the objects and functions in the ``ssl`` module; for more
 general information about TLS, SSL, and certificates, the reader is referred to
@@ -473,9 +474,6 @@ Certificate handling
    * :attr:`openssl_cafile` - hard coded path to a cafile,
    * :attr:`openssl_capath_env` - OpenSSL's environment key that points to a capath,
    * :attr:`openssl_capath` - hard coded path to a capath directory
-
-   .. availability:: LibreSSL ignores the environment vars
-     :attr:`openssl_cafile_env` and :attr:`openssl_capath_env`.
 
    .. versionadded:: 3.4
 
@@ -1144,7 +1142,7 @@ SSL Sockets
 
    .. versionchanged:: 3.5
       The :meth:`shutdown` does not reset the socket timeout each time bytes
-      are received or sent. The socket timeout is now to maximum total duration
+      are received or sent. The socket timeout is now the maximum total duration
       of the shutdown.
 
    .. deprecated:: 3.6
@@ -1177,8 +1175,8 @@ SSL sockets also have the following additional methods and attributes:
    cause write operations.
 
    .. versionchanged:: 3.5
-      The socket timeout is no more reset each time bytes are received or sent.
-      The socket timeout is now to maximum total duration to read up to *len*
+      The socket timeout is no longer reset each time bytes are received or sent.
+      The socket timeout is now the maximum total duration to read up to *len*
       bytes.
 
    .. deprecated:: 3.6
@@ -1196,8 +1194,8 @@ SSL sockets also have the following additional methods and attributes:
    also cause read operations.
 
    .. versionchanged:: 3.5
-      The socket timeout is no more reset each time bytes are received or sent.
-      The socket timeout is now to maximum total duration to write *buf*.
+      The socket timeout is no longer reset each time bytes are received or sent.
+      The socket timeout is now the maximum total duration to write *buf*.
 
    .. deprecated:: 3.6
       Use :meth:`~SSLSocket.send` instead of :meth:`~SSLSocket.write`.
@@ -1224,14 +1222,14 @@ SSL sockets also have the following additional methods and attributes:
       :attr:`~SSLSocket.context` is true.
 
    .. versionchanged:: 3.5
-      The socket timeout is no more reset each time bytes are received or sent.
-      The socket timeout is now to maximum total duration of the handshake.
+      The socket timeout is no longer reset each time bytes are received or sent.
+      The socket timeout is now the maximum total duration of the handshake.
 
    .. versionchanged:: 3.7
       Hostname or IP address is matched by OpenSSL during handshake. The
       function :func:`match_hostname` is no longer used. In case OpenSSL
       refuses a hostname or IP address, the handshake is aborted early and
-      a TLS alert message is send to the peer.
+      a TLS alert message is sent to the peer.
 
 .. method:: SSLSocket.getpeercert(binary_form=False)
 
@@ -1910,7 +1908,7 @@ to speed up repeated connections from the same clients.
 .. method:: SSLContext.session_stats()
 
    Get statistics about the SSL sessions created or managed by this context.
-   A dictionary is returned which maps the names of each `piece of information <https://www.openssl.org/docs/man1.1.1/ssl/SSL_CTX_sess_number.html>`_ to their
+   A dictionary is returned which maps the names of each `piece of information <https://www.openssl.org/docs/man1.1.1/man3/SSL_CTX_sess_number.html>`_ to their
    numeric values.  For example, here is the total number of hits and misses
    in the session cache since the context was created::
 
@@ -2704,7 +2702,7 @@ enabled when negotiating a SSL session is possible through the
 :meth:`SSLContext.set_ciphers` method.  Starting from Python 3.2.3, the
 ssl module disables certain weak ciphers by default, but you may want
 to further restrict the cipher choice. Be sure to read OpenSSL's documentation
-about the `cipher list format <https://www.openssl.org/docs/manmaster/man1/ciphers.html#CIPHER-LIST-FORMAT>`_.
+about the `cipher list format <https://www.openssl.org/docs/man1.1.1/man1/ciphers.html#CIPHER-LIST-FORMAT>`_.
 If you want to check which ciphers are enabled by a given cipher list, use
 :meth:`SSLContext.get_ciphers` or the ``openssl ciphers`` command on your
 system.
