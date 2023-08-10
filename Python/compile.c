@@ -211,13 +211,13 @@ write_instr(_Py_CODEUNIT *codestr, struct instr *instruction, int ilen)
     int caches = _PyOpcode_Caches[opcode];
     switch (ilen - caches) {
         case 4:
-            *codestr++ = _Py_MAKECODEUNIT(EXTENDED_ARG_QUICK, (oparg >> 24) & 0xFF);
+            *codestr++ = _Py_MAKECODEUNIT(EXTENDED_ARG, (oparg >> 24) & 0xFF);
             /* fall through */
         case 3:
-            *codestr++ = _Py_MAKECODEUNIT(EXTENDED_ARG_QUICK, (oparg >> 16) & 0xFF);
+            *codestr++ = _Py_MAKECODEUNIT(EXTENDED_ARG, (oparg >> 16) & 0xFF);
             /* fall through */
         case 2:
-            *codestr++ = _Py_MAKECODEUNIT(EXTENDED_ARG_QUICK, (oparg >> 8) & 0xFF);
+            *codestr++ = _Py_MAKECODEUNIT(EXTENDED_ARG, (oparg >> 8) & 0xFF);
             /* fall through */
         case 1:
             *codestr++ = _Py_MAKECODEUNIT(opcode, oparg & 0xFF);
@@ -1803,7 +1803,7 @@ compiler_enter_scope(struct compiler *c, identifier name,
     c->u->u_curblock = block;
 
     if (u->u_scope_type == COMPILER_SCOPE_MODULE) {
-        c->u->u_lineno = -1;
+        c->u->u_lineno = 0;
     }
     else {
         if (!compiler_set_qualname(c))
@@ -1811,6 +1811,9 @@ compiler_enter_scope(struct compiler *c, identifier name,
     }
     ADDOP_I(c, RESUME, 0);
 
+    if (u->u_scope_type == COMPILER_SCOPE_MODULE) {
+        c->u->u_lineno = -1;
+    }
     return 1;
 }
 
@@ -2927,6 +2930,7 @@ compiler_jump_if(struct compiler *c, expr_ty e, basicblock *next, int cond)
         return 1;
     }
     case Compare_kind: {
+        SET_LOC(c, e);
         Py_ssize_t i, n = asdl_seq_LEN(e->v.Compare.ops) - 1;
         if (n > 0) {
             if (!check_compare(c, e)) {
@@ -3255,12 +3259,20 @@ static int
 compiler_break(struct compiler *c)
 {
     struct fblockinfo *loop = NULL;
+    int u_lineno = c->u->u_lineno;
+    int u_col_offset = c->u->u_col_offset;
+    int u_end_lineno = c->u->u_end_lineno;
+    int u_end_col_offset = c->u->u_end_col_offset;
     /* Emit instruction with line number */
     ADDOP(c, NOP);
     if (!compiler_unwind_fblock_stack(c, 0, &loop)) {
         return 0;
     }
     if (loop == NULL) {
+        c->u->u_lineno = u_lineno;
+        c->u->u_col_offset = u_col_offset;
+        c->u->u_end_lineno = u_end_lineno;
+        c->u->u_end_col_offset = u_end_col_offset;
         return compiler_error(c, "'break' outside loop");
     }
     if (!compiler_unwind_fblock(c, loop, 0)) {
@@ -3274,12 +3286,20 @@ static int
 compiler_continue(struct compiler *c)
 {
     struct fblockinfo *loop = NULL;
+    int u_lineno = c->u->u_lineno;
+    int u_col_offset = c->u->u_col_offset;
+    int u_end_lineno = c->u->u_end_lineno;
+    int u_end_col_offset = c->u->u_end_col_offset;
     /* Emit instruction with line number */
     ADDOP(c, NOP);
     if (!compiler_unwind_fblock_stack(c, 0, &loop)) {
         return 0;
     }
     if (loop == NULL) {
+        c->u->u_lineno = u_lineno;
+        c->u->u_col_offset = u_col_offset;
+        c->u->u_end_lineno = u_end_lineno;
+        c->u->u_end_col_offset = u_end_col_offset;
         return compiler_error(c, "'continue' not properly in loop");
     }
     ADDOP_JUMP(c, JUMP, loop->fb_block);
@@ -4780,6 +4800,33 @@ is_import_originated(struct compiler *c, expr_ty e)
     return flags & DEF_IMPORT;
 }
 
+// If an attribute access spans multiple lines, update the current start
+// location to point to the attribute name.
+static void
+update_start_location_to_match_attr(struct compiler *c, expr_ty attr)
+{
+    assert(attr->kind == Attribute_kind);
+    if (c->u->u_lineno != attr->end_lineno) {
+        c->u->u_lineno = attr->end_lineno;
+        int len = (int)PyUnicode_GET_LENGTH(attr->v.Attribute.attr);
+        if (len <= attr->end_col_offset) {
+            c->u->u_col_offset = attr->end_col_offset - len;
+        }
+        else {
+            // GH-94694: Somebody's compiling weird ASTs. Just drop the columns:
+            c->u->u_col_offset = -1;
+            c->u->u_end_col_offset = -1;
+        }
+        // Make sure the end position still follows the start position, even for
+        // weird ASTs:
+        c->u->u_end_lineno = Py_MAX(c->u->u_lineno, c->u->u_end_lineno);
+        if (c->u->u_lineno == c->u->u_end_lineno) {
+            c->u->u_end_col_offset = Py_MAX(c->u->u_col_offset,
+                                            c->u->u_end_col_offset);
+        }
+    }
+}
+
 // Return 1 if the method call was optimized, -1 if not, and 0 on error.
 static int
 maybe_optimize_method_call(struct compiler *c, expr_ty e)
@@ -4821,8 +4868,8 @@ maybe_optimize_method_call(struct compiler *c, expr_ty e)
     }
     /* Alright, we can optimize the code. */
     VISIT(c, expr, meth->v.Attribute.value);
-    int old_lineno = c->u->u_lineno;
-    c->u->u_lineno = meth->end_lineno;
+    SET_LOC(c, meth);
+    update_start_location_to_match_attr(c, meth);
     ADDOP_NAME(c, LOAD_METHOD, meth->v.Attribute.attr, names);
     VISIT_SEQ(c, expr, e->v.Call.args);
 
@@ -4832,9 +4879,10 @@ maybe_optimize_method_call(struct compiler *c, expr_ty e)
             return 0;
         };
     }
+    SET_LOC(c, e);
+    update_start_location_to_match_attr(c, meth);
     ADDOP_I(c, PRECALL, argsl + kwdsl);
     ADDOP_I(c, CALL, argsl + kwdsl);
-    c->u->u_lineno = old_lineno;
     return 1;
 }
 
@@ -4891,7 +4939,7 @@ compiler_joined_str(struct compiler *c, expr_ty e)
     Py_ssize_t value_count = asdl_seq_LEN(e->v.JoinedStr.values);
     if (value_count > STACK_USE_GUIDELINE) {
         _Py_DECLARE_STR(empty, "");
-        ADDOP_LOAD_CONST_NEW(c, &_Py_STR(empty));
+        ADDOP_LOAD_CONST_NEW(c, Py_NewRef(&_Py_STR(empty)));
         ADDOP_NAME(c, LOAD_METHOD, &_Py_ID(join), names);
         ADDOP_I(c, BUILD_LIST, 0);
         for (Py_ssize_t i = 0; i < asdl_seq_LEN(e->v.JoinedStr.values); i++) {
@@ -5842,23 +5890,18 @@ compiler_visit_expr1(struct compiler *c, expr_ty e)
     /* The following exprs can be assignment targets. */
     case Attribute_kind:
         VISIT(c, expr, e->v.Attribute.value);
+        update_start_location_to_match_attr(c, e);
         switch (e->v.Attribute.ctx) {
         case Load:
         {
-            int old_lineno = c->u->u_lineno;
-            c->u->u_lineno = e->end_lineno;
             ADDOP_NAME(c, LOAD_ATTR, e->v.Attribute.attr, names);
-            c->u->u_lineno = old_lineno;
             break;
         }
         case Store:
             if (forbidden_name(c, e->v.Attribute.attr, e->v.Attribute.ctx)) {
                 return 0;
             }
-            int old_lineno = c->u->u_lineno;
-            c->u->u_lineno = e->end_lineno;
             ADDOP_NAME(c, STORE_ATTR, e->v.Attribute.attr, names);
-            c->u->u_lineno = old_lineno;
             break;
         case Del:
             ADDOP_NAME(c, DELETE_ATTR, e->v.Attribute.attr, names);
@@ -5924,10 +5967,8 @@ compiler_augassign(struct compiler *c, stmt_ty s)
     case Attribute_kind:
         VISIT(c, expr, e->v.Attribute.value);
         ADDOP_I(c, COPY, 1);
-        int old_lineno = c->u->u_lineno;
-        c->u->u_lineno = e->end_lineno;
+        update_start_location_to_match_attr(c, e);
         ADDOP_NAME(c, LOAD_ATTR, e->v.Attribute.attr, names);
-        c->u->u_lineno = old_lineno;
         break;
     case Subscript_kind:
         VISIT(c, expr, e->v.Subscript.value);
@@ -5959,7 +6000,7 @@ compiler_augassign(struct compiler *c, stmt_ty s)
 
     switch (e->kind) {
     case Attribute_kind:
-        c->u->u_lineno = e->end_lineno;
+        update_start_location_to_match_attr(c, e);
         ADDOP_I(c, SWAP, 2);
         ADDOP_NAME(c, STORE_ATTR, e->v.Attribute.attr, names);
         break;
@@ -7508,6 +7549,7 @@ write_location_info_short_form(struct assembler* a, int length, int column, int 
     int column_low_bits = column & 7;
     int column_group = column >> 3;
     assert(column < 80);
+    assert(end_column >= column);
     assert(end_column - column < 16);
     write_location_first_byte(a, PY_CODE_LOCATION_INFO_SHORT0 + column_group, length);
     write_location_byte(a, (column_low_bits << 4) | (end_column - column));
@@ -7579,7 +7621,7 @@ write_location_info_entry(struct assembler* a, struct instr* i, int isize)
         }
     }
     else if (i->i_end_lineno == i->i_lineno) {
-        if (line_delta == 0 && column < 80 && end_column - column < 16) {
+        if (line_delta == 0 && column < 80 && end_column - column < 16 && end_column >= column) {
             write_location_info_short_form(a, isize, column, end_column);
             return 1;
         }
@@ -8287,6 +8329,7 @@ assemble(struct compiler *c, int addNone)
     int j, nblocks;
     PyCodeObject *co = NULL;
     PyObject *consts = NULL;
+    memset(&a, 0, sizeof(struct assembler));
 
     /* Make sure every block that falls off the end returns None. */
     if (!c->u->u_curblock->b_return) {
@@ -8378,12 +8421,7 @@ assemble(struct compiler *c, int addNone)
     if (maxdepth < 0) {
         goto error;
     }
-    if (maxdepth > MAX_ALLOWED_STACK_USE) {
-        PyErr_Format(PyExc_SystemError,
-                     "excessive stack use: stack is %d deep",
-                     maxdepth);
-        goto error;
-    }
+    /* TO DO -- For 3.12, make sure that `maxdepth <= MAX_ALLOWED_STACK_USE` */
 
     if (label_exception_targets(entryblock)) {
         goto error;
@@ -8965,6 +9003,16 @@ error:
     return -1;
 }
 
+static bool
+basicblock_has_lineno(const basicblock *bb) {
+    for (int i = 0; i < bb->b_iused; i++) {
+        if (bb->b_instr[i].i_lineno > 0) {
+            return true;
+        }
+    }
+    return false;
+}
+
 /* If this block ends with an unconditional jump to an exit block,
  * then remove the jump and extend this block with the target.
  */
@@ -8981,6 +9029,10 @@ extend_block(basicblock *bb) {
     }
     if (last->i_target->b_exit && last->i_target->b_iused <= MAX_COPY_SIZE) {
         basicblock *to_copy = last->i_target;
+        if (basicblock_has_lineno(to_copy)) {
+            /* copy only blocks without line number (like implicit 'return None's) */
+            return 0;
+        }
         last->i_opcode = NOP;
         for (int i = 0; i < to_copy->b_iused; i++) {
             int index = compiler_next_instr(bb);
@@ -9013,7 +9065,10 @@ clean_basic_block(basicblock *bb) {
             /* or, if the next instruction has same line number or no line number */
             if (src < bb->b_iused - 1) {
                 int next_lineno = bb->b_instr[src+1].i_lineno;
-                if (next_lineno < 0 || next_lineno == lineno) {
+                if (next_lineno == lineno) {
+                    continue;
+                }
+                if (next_lineno < 0) {
                     COPY_INSTR_LOC(bb->b_instr[src], bb->b_instr[src+1]);
                     continue;
                 }

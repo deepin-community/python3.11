@@ -27,8 +27,10 @@ _PyFunction_FromConstructor(PyFrameConstructor *constr)
     op->func_qualname = constr->fc_qualname;
     Py_INCREF(constr->fc_code);
     op->func_code = constr->fc_code;
-    op->func_defaults = NULL;
-    op->func_kwdefaults = NULL;
+    Py_XINCREF(constr->fc_defaults);
+    op->func_defaults = constr->fc_defaults;
+    Py_XINCREF(constr->fc_kwdefaults);
+    op->func_kwdefaults = constr->fc_kwdefaults;
     Py_XINCREF(constr->fc_closure);
     op->func_closure = constr->fc_closure;
     Py_INCREF(Py_None);
@@ -300,7 +302,6 @@ func_get_annotation_dict(PyFunctionObject *op)
         }
         Py_SETREF(op->func_annotations, ann_dict);
     }
-    Py_INCREF(op->func_annotations);
     assert(PyDict_Check(op->func_annotations));
     return op->func_annotations;
 }
@@ -532,7 +533,11 @@ func_get_annotations(PyFunctionObject *op, void *Py_UNUSED(ignored))
         if (op->func_annotations == NULL)
             return NULL;
     }
-    return func_get_annotation_dict(op);
+    PyObject *d = func_get_annotation_dict(op);
+    if (d) {
+        Py_INCREF(d);
+    }
+    return d;
 }
 
 static int

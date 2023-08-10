@@ -202,9 +202,9 @@ _PyArg_VaParse_SizeT(PyObject *args, const char *format, va_list va)
 static int
 cleanup_ptr(PyObject *self, void *ptr)
 {
-    if (ptr) {
-        PyMem_Free(ptr);
-    }
+    void **pptr = (void **)ptr;
+    PyMem_Free(*pptr);
+    *pptr = NULL;
     return 0;
 }
 
@@ -1017,7 +1017,7 @@ convertsimple(PyObject *arg, const char **p_format, va_list *p_va, int flags,
     {
         if (PyErr_WarnFormat(PyExc_DeprecationWarning, 1,
                 "getargs: The '%c' format is deprecated. Use 'U' instead.", c)) {
-            return NULL;
+            RETURN_ERR_OCCURRED;
         }
 _Py_COMP_DIAG_PUSH
 _Py_COMP_DIAG_IGNORE_DEPR_DECLS
@@ -1169,7 +1169,7 @@ _Py_COMP_DIAG_POP
                     PyErr_NoMemory();
                     RETURN_ERR_OCCURRED;
                 }
-                if (addcleanup(*buffer, freelist, cleanup_ptr)) {
+                if (addcleanup(buffer, freelist, cleanup_ptr)) {
                     Py_DECREF(s);
                     return converterr(
                         "(cleanup problem)",
@@ -1215,7 +1215,7 @@ _Py_COMP_DIAG_POP
                 PyErr_NoMemory();
                 RETURN_ERR_OCCURRED;
             }
-            if (addcleanup(*buffer, freelist, cleanup_ptr)) {
+            if (addcleanup(buffer, freelist, cleanup_ptr)) {
                 Py_DECREF(s);
                 return converterr("(cleanup problem)",
                                 arg, msgbuf, bufsize);
@@ -1554,6 +1554,50 @@ _PyArg_VaParseTupleAndKeywordsFast_SizeT(PyObject *args, PyObject *keywords,
     return retval;
 }
 
+static void
+error_unexpected_keyword_arg(PyObject *kwargs, PyObject *kwnames, PyObject *kwtuple, const char *fname)
+{
+    /* make sure there are no extraneous keyword arguments */
+    Py_ssize_t j = 0;
+    while (1) {
+        PyObject *keyword;
+        if (kwargs != NULL) {
+            if (!PyDict_Next(kwargs, &j, &keyword, NULL))
+                break;
+        }
+        else {
+            if (j >= PyTuple_GET_SIZE(kwnames))
+                break;
+            keyword = PyTuple_GET_ITEM(kwnames, j);
+            j++;
+        }
+        if (!PyUnicode_Check(keyword)) {
+            PyErr_SetString(PyExc_TypeError,
+                            "keywords must be strings");
+            return;
+        }
+
+        int match = PySequence_Contains(kwtuple, keyword);
+        if (match <= 0) {
+            if (!match) {
+                PyErr_Format(PyExc_TypeError,
+                             "'%S' is an invalid keyword "
+                             "argument for %.200s%s",
+                             keyword,
+                             (fname == NULL) ? "this function" : fname,
+                             (fname == NULL) ? "" : "()");
+            }
+            return;
+        }
+    }
+    /* Something wrong happened. There are extraneous keyword arguments,
+     * but we don't know what. And we don't bother. */
+    PyErr_Format(PyExc_TypeError,
+                 "invalid keyword argument for %.200s%s",
+                 (fname == NULL) ? "this function" : fname,
+                 (fname == NULL) ? "" : "()");
+}
+
 int
 PyArg_ValidateKeywordArguments(PyObject *kwargs)
 {
@@ -1842,6 +1886,13 @@ vgetargskeywords(PyObject *args, PyObject *kwargs, const char *format,
                 return cleanreturn(0, &freelist);
             }
         }
+        /* Something wrong happened. There are extraneous keyword arguments,
+         * but we don't know what. And we don't bother. */
+        PyErr_Format(PyExc_TypeError,
+                     "invalid keyword argument for %.200s%s",
+                     (fname == NULL) ? "this function" : fname,
+                     (fname == NULL) ? "" : "()");
+        return cleanreturn(0, &freelist);
     }
 
     return cleanreturn(1, &freelist);
@@ -2184,7 +2235,6 @@ vgetargskeywordsfast_impl(PyObject *const *args, Py_ssize_t nargs,
     assert(IS_END_OF_FORMAT(*format) || (*format == '|') || (*format == '$'));
 
     if (nkwargs > 0) {
-        Py_ssize_t j;
         /* make sure there are no arguments given by name and position */
         for (i = pos; i < nargs; i++) {
             keyword = PyTuple_GET_ITEM(kwtuple, i - pos);
@@ -2208,34 +2258,9 @@ vgetargskeywordsfast_impl(PyObject *const *args, Py_ssize_t nargs,
                 return cleanreturn(0, &freelist);
             }
         }
-        /* make sure there are no extraneous keyword arguments */
-        j = 0;
-        while (1) {
-            int match;
-            if (kwargs != NULL) {
-                if (!PyDict_Next(kwargs, &j, &keyword, NULL))
-                    break;
-            }
-            else {
-                if (j >= PyTuple_GET_SIZE(kwnames))
-                    break;
-                keyword = PyTuple_GET_ITEM(kwnames, j);
-                j++;
-            }
 
-            match = PySequence_Contains(kwtuple, keyword);
-            if (match <= 0) {
-                if (!match) {
-                    PyErr_Format(PyExc_TypeError,
-                                 "'%S' is an invalid keyword "
-                                 "argument for %.200s%s",
-                                 keyword,
-                                 (parser->fname == NULL) ? "this function" : parser->fname,
-                                 (parser->fname == NULL) ? "" : "()");
-                }
-                return cleanreturn(0, &freelist);
-            }
-        }
+        error_unexpected_keyword_arg(kwargs, kwnames, kwtuple, parser->fname);
+        return cleanreturn(0, &freelist);
     }
 
     return cleanreturn(1, &freelist);
@@ -2409,7 +2434,6 @@ _PyArg_UnpackKeywords(PyObject *const *args, Py_ssize_t nargs,
     }
 
     if (nkwargs > 0) {
-        Py_ssize_t j;
         /* make sure there are no arguments given by name and position */
         for (i = posonly; i < nargs; i++) {
             keyword = PyTuple_GET_ITEM(kwtuple, i - posonly);
@@ -2433,34 +2457,9 @@ _PyArg_UnpackKeywords(PyObject *const *args, Py_ssize_t nargs,
                 return NULL;
             }
         }
-        /* make sure there are no extraneous keyword arguments */
-        j = 0;
-        while (1) {
-            int match;
-            if (kwargs != NULL) {
-                if (!PyDict_Next(kwargs, &j, &keyword, NULL))
-                    break;
-            }
-            else {
-                if (j >= PyTuple_GET_SIZE(kwnames))
-                    break;
-                keyword = PyTuple_GET_ITEM(kwnames, j);
-                j++;
-            }
 
-            match = PySequence_Contains(kwtuple, keyword);
-            if (match <= 0) {
-                if (!match) {
-                    PyErr_Format(PyExc_TypeError,
-                                 "'%S' is an invalid keyword "
-                                 "argument for %.200s%s",
-                                 keyword,
-                                 (parser->fname == NULL) ? "this function" : parser->fname,
-                                 (parser->fname == NULL) ? "" : "()");
-                }
-                return NULL;
-            }
-        }
+        error_unexpected_keyword_arg(kwargs, kwnames, kwtuple, parser->fname);
+        return NULL;
     }
 
     return buf;
@@ -2571,7 +2570,25 @@ _PyArg_UnpackKeywordsWithVararg(PyObject *const *args, Py_ssize_t nargs,
             current_arg = NULL;
         }
 
-        buf[i + vararg + 1] = current_arg;
+        /* If an arguments is passed in as a keyword argument,
+         * it should be placed before `buf[vararg]`.
+         *
+         * For example:
+         * def f(a, /, b, *args):
+         *     pass
+         * f(1, b=2)
+         *
+         * This `buf` array should be: [1, 2, NULL].
+         * In this case, nargs < vararg.
+         *
+         * Otherwise, we leave a place at `buf[vararg]` for vararg tuple
+         * so the index is `i + 1`. */
+        if (nargs < vararg) {
+            buf[i] = current_arg;
+        }
+        else {
+            buf[i + 1] = current_arg;
+        }
 
         if (current_arg) {
             --nkwargs;
@@ -2589,35 +2606,8 @@ _PyArg_UnpackKeywordsWithVararg(PyObject *const *args, Py_ssize_t nargs,
     }
 
     if (nkwargs > 0) {
-        Py_ssize_t j;
-        /* make sure there are no extraneous keyword arguments */
-        j = 0;
-        while (1) {
-            int match;
-            if (kwargs != NULL) {
-                if (!PyDict_Next(kwargs, &j, &keyword, NULL))
-                    break;
-            }
-            else {
-                if (j >= PyTuple_GET_SIZE(kwnames))
-                    break;
-                keyword = PyTuple_GET_ITEM(kwnames, j);
-                j++;
-            }
-
-            match = PySequence_Contains(kwtuple, keyword);
-            if (match <= 0) {
-                if (!match) {
-                    PyErr_Format(PyExc_TypeError,
-                                 "'%S' is an invalid keyword "
-                                 "argument for %.200s%s",
-                                 keyword,
-                                 (parser->fname == NULL) ? "this function" : parser->fname,
-                                 (parser->fname == NULL) ? "" : "()");
-                }
-                goto exit;
-            }
-        }
+        error_unexpected_keyword_arg(kwargs, kwnames, kwtuple, parser->fname);
+        goto exit;
     }
 
     return buf;
@@ -2695,9 +2685,7 @@ skipitem(const char **p_format, va_list *p_va, int flags)
             if (*format == '#') {
                 if (p_va != NULL) {
                     if (!(flags & FLAG_SIZE_T)) {
-                        PyErr_SetString(PyExc_SystemError,
-                                "PY_SSIZE_T_CLEAN macro must be defined for '#' formats");
-                        return NULL;
+                        return "PY_SSIZE_T_CLEAN macro must be defined for '#' formats";
                     }
                     (void) va_arg(*p_va, Py_ssize_t *);
                 }

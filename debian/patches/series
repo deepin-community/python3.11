@@ -1,4 +1,4 @@
-#git-updates.diff
+# git-updates.diff
 deb-setup.diff
 deb-locations.diff
 distutils-install-layout.diff
@@ -38,3 +38,4 @@ sphinx3.diff
 destshared-location.diff
 fix-py_compile.diff
 ntpath-import.diff
+shutdown-deadlock.diff

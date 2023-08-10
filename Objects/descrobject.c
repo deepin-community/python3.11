@@ -16,7 +16,7 @@ class property "propertyobject *" "&PyProperty_Type"
 // see pycore_object.h
 #if defined(__EMSCRIPTEN__) && defined(PY_CALL_TRAMPOLINE)
 #include <emscripten.h>
-EM_JS(PyObject*, descr_set_trampoline_call, (setter set, PyObject *obj, PyObject *value, void *closure), {
+EM_JS(int, descr_set_trampoline_call, (setter set, PyObject *obj, PyObject *value, void *closure), {
     return wasmTable.get(set)(obj, value, closure);
 });
 
@@ -775,7 +775,7 @@ PyTypeObject PyClassMethodDescr_Type = {
     0,                                          /* tp_weaklistoffset */
     0,                                          /* tp_iter */
     0,                                          /* tp_iternext */
-    descr_methods,                              /* tp_methods */
+    0,                                          /* tp_methods */
     descr_members,                              /* tp_members */
     method_getset,                              /* tp_getset */
     0,                                          /* tp_base */
@@ -1723,9 +1723,10 @@ property_copy(PyObject *old, PyObject *get, PyObject *set, PyObject *del)
     Py_DECREF(type);
     if (new == NULL)
         return NULL;
-
-    Py_XINCREF(pold->prop_name);
-    Py_XSETREF(((propertyobject *) new)->prop_name, pold->prop_name);
+    if (PyObject_TypeCheck((new), &PyProperty_Type)) {
+        Py_XINCREF(pold->prop_name);
+        Py_XSETREF(((propertyobject *) new)->prop_name, pold->prop_name);
+    }
     return new;
 }
 

@@ -74,7 +74,10 @@
  PyClassMethod_Type@Base @SVER@
  PyCode_Addr2Line@Base @SVER@
  PyCode_Addr2Location@Base @SVER@
+ PyCode_GetCellvars@Base @SVER@
  PyCode_GetCode@Base @SVER@
+ PyCode_GetFreevars@Base @SVER@
+ PyCode_GetVarnames@Base @SVER@
  PyCode_New@Base @SVER@
  PyCode_NewEmpty@Base @SVER@
  PyCode_NewWithPosOnlyArgs@Base @SVER@
@@ -1254,6 +1257,8 @@
  _PyImport_FrozenBootstrap@Base @SVER@
  _PyImport_FrozenStdlib@Base @SVER@
  _PyImport_FrozenTest@Base @SVER@
+ _PyImport_GetModuleAttr@Base @SVER@
+ _PyImport_GetModuleAttrString@Base @SVER@
  _PyImport_GetModuleId@Base @SVER@
  _PyImport_IsInitialized@Base @SVER@
  _PyImport_ReleaseLock@Base @SVER@

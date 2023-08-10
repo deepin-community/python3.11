@@ -30,13 +30,6 @@ static void pymem_destructor(PyObject *ptr)
 /*
   PyCField_Type
 */
-static PyObject *
-PyCField_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
-{
-    CFieldObject *obj;
-    obj = (CFieldObject *)type->tp_alloc(type, 0);
-    return (PyObject *)obj;
-}
 
 /*
  * Expects the size, index and offset for the current field in *psize and
@@ -68,7 +61,7 @@ PyCField_FromDesc(PyObject *desc, Py_ssize_t index,
 #define CONT_BITFIELD 2
 #define EXPAND_BITFIELD 3
 
-    self = (CFieldObject *)_PyObject_CallNoArgs((PyObject *)&PyCField_Type);
+    self = (CFieldObject *)PyCField_Type.tp_alloc((PyTypeObject *)&PyCField_Type, 0);
     if (self == NULL)
         return NULL;
     dict = PyType_stgdict(desc);
@@ -279,6 +272,7 @@ PyCField_clear(CFieldObject *self)
 static void
 PyCField_dealloc(PyObject *self)
 {
+    PyObject_GC_UnTrack(self);
     PyCField_clear((CFieldObject *)self);
     Py_TYPE(self)->tp_free((PyObject *)self);
 }
@@ -342,7 +336,7 @@ PyTypeObject PyCField_Type = {
     0,                                          /* tp_dictoffset */
     0,                                          /* tp_init */
     0,                                          /* tp_alloc */
-    PyCField_new,                               /* tp_new */
+    0,                                          /* tp_new */
     0,                                          /* tp_free */
 };
 

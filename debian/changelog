@@ -1,8 +1,145 @@
-python3.11 (3.11.0~b3-2) UNRELEASED; urgency=medium
+python3.11 (3.11.2-6) unstable; urgency=high
 
-  * update
+  [ Stefano Rivera ]
+  * Explain more ways to pass --break-system-packages to pip.
 
- -- Matthias Klose <doko@debian.org>  Wed, 22 Jun 2022 13:11:59 +0800
+  [ Matthias Klose ]
+  * Fix syntax error in python3-dbg-config script. LP: #2009967.
+
+ -- Matthias Klose <doko@debian.org>  Mon, 13 Mar 2023 13:18:29 +0100
+
+python3.11 (3.11.2-5) unstable; urgency=medium
+
+  [ Matthias Klose ]
+  * Update VCS attributes.
+  * Fix error message for 'python3 -m venv dir`, when python3-venv
+    is not installed. Closes: #1026268.
+
+  [ Stefano Rivera ]
+  * Mention that deleting EXTERNALLY-MANAGED is an option, in README.venv.
+  * Patch: fix deadlock at shutdown when clearing thread states.
+    Closes: #1032019.
+  * Override expat embedded-library lintian false-positives. (See: #1031859)
+
+ -- Matthias Klose <doko@debian.org>  Sun, 05 Mar 2023 09:28:49 +0100
+
+python3.11 (3.11.2-4) unstable; urgency=medium
+
+  [ Stefano Rivera ]
+  * Revert the CCSHARED patch to test_customize_compiler, this was WIP and
+    didn't work.
+
+  [Matthias Klose]
+  * Remove build dependency on libb2-dev, oldish library.
+  * Build with internal mpdecimal library, so that mpdecimal can be removed
+    for bookworm.
+
+ -- Matthias Klose <doko@debian.org>  Sun, 12 Feb 2023 01:48:52 +0100
+
+python3.11 (3.11.2-3) unstable; urgency=medium
+
+  [ Stefano Rivera ]
+  * Refresh patches.
+  * Revert pip importlib.metadata workaround, fixed in pip 22.2.
+  * Declare python3.11 to be PEP 668 EXTERNALLY-MANAGED.
+  * Update and install README.venv, explaining this.
+  * Recommend ca-certificates from python3.11. Closes: #960869.
+  * Configure --with-ssl-default-suites=openssl. Closes: #1026802.
+  * Update watch file.
+  * Include CCSHARED override in distutils test_customize_compiler.
+
+  [Matthias Klose]
+  * Really new upstream version.
+  * Configure --with-ssl-default-suites=openssl. Closes: #1009189.
+  * Build-depend on libb2-dev.
+  * Fix removing Debian build flags from _sysconfigdata. LP: #2006738.
+
+ -- Matthias Klose <doko@debian.org>  Fri, 10 Feb 2023 05:59:34 +0100
+
+python3.11 (3.11.2-1) unstable; urgency=medium
+
+  * New upstream version.
+
+ -- Matthias Klose <doko@debian.org>  Mon, 06 Feb 2023 21:27:04 +0100
+
+python3.11 (3.11.1-2) unstable; urgency=medium
+
+  * Fix NameError exception in venv init (Daniel Andersson). Closes: #1026448.
+  * Fix FTCBFS: Pass --with-build-python (Helmut Grohne). Closes: #1024297.
+
+ -- Matthias Klose <doko@debian.org>  Sat, 31 Dec 2022 11:23:59 +0100
+
+python3.11 (3.11.1-1) unstable; urgency=medium
+
+  * Python 3.11.1 release.
+
+ -- Matthias Klose <doko@debian.org>  Wed, 07 Dec 2022 09:49:13 +0100
+
+python3.11 (3.11.0-3) unstable; urgency=medium
+
+  * Fix valgrind detection.
+
+ -- Matthias Klose <doko@debian.org>  Fri, 04 Nov 2022 10:23:33 +0100
+
+python3.11 (3.11.0-2) unstable; urgency=medium
+
+  * Update to the 3.11 branch 2022-11-03.
+    - debian/patches/CVE-2022-42919.patch: don't use Linux abstract sockets
+      in Lib/multiprocessing/connection.py.
+    - CVE-2022-42919
+  * Fix GDB auto-load files. Closes: #1017913.
+  * Add support for systemd-binfmt. Closes: #1013973.
+  * libpython3.11-dev: Install Python.asdl and python.gram. Closes: #1022951.
+  * Configure the python3-dbg interpreter --with-valgrind. Closes: #1006315.
+  * Bump standards version.
+
+ -- Matthias Klose <doko@debian.org>  Thu, 03 Nov 2022 16:41:50 +0100
+
+python3.11 (3.11.0-1) unstable; urgency=medium
+
+  * Python 3.11.0 release.
+  * Update symbols files.
+
+ -- Matthias Klose <doko@debian.org>  Mon, 24 Oct 2022 23:26:25 +0200
+
+python3.11 (3.11.0~rc2-2) unstable; urgency=medium
+
+  [ Stefano Rivera ]
+  * autopkgtests: Support python3-setuptools >= 64, which does PEP-660
+    editable installs.
+
+ -- Matthias Klose <doko@debian.org>  Sat, 01 Oct 2022 06:34:05 +0200
+
+python3.11 (3.11.0~rc2-1) unstable; urgency=medium
+
+  * Python 3.11.0 release candidate 2.
+
+ -- Matthias Klose <doko@debian.org>  Mon, 12 Sep 2022 18:20:24 +0200
+
+python3.11 (3.11.0~rc1-1) unstable; urgency=medium
+
+  * Python 3.11.0 release candidate 1.
+  * Add python3.11-venv as a dependency for the testsuite* autopkg tests.
+  * Don't run the cppext test during the build.
+  * Fix two site and sysconfig tests.
+
+ -- Matthias Klose <doko@debian.org>  Wed, 10 Aug 2022 13:16:05 +0200
+
+python3.11 (3.11.0~b4-2) unstable; urgency=medium
+
+  * Work around https://github.com/pypa/pip/issues/11183.
+
+ -- Matthias Klose <doko@debian.org>  Wed, 20 Jul 2022 12:00:00 +0200
+
+python3.11 (3.11.0~b4-1) unstable; urgency=medium
+
+  * Python 3.11.0 beta 4 snapshot.
+  * Fix more references to 3.11 in the autopkg tests.
+  * Update local-doc-references patch for 3.11.
+  * Remove i386 specific symbols files.
+  * Update symbols files.
+
+ -- Matthias Klose <doko@debian.org>  Wed, 13 Jul 2022 11:00:16 +0200
 
 python3.11 (3.11.0~b3-2) unstable; urgency=medium
 

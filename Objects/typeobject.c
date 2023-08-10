@@ -11,7 +11,6 @@
 #include "pycore_pystate.h"       // _PyThreadState_GET()
 #include "pycore_typeobject.h"    // struct type_cache
 #include "pycore_unionobject.h"   // _Py_union_type_or
-#include "frameobject.h"          // PyFrameObject
 #include "pycore_frame.h"         // _PyInterpreterFrame
 #include "opcode.h"               // MAKE_CELL
 #include "structmember.h"         // PyMemberDef
@@ -2225,6 +2224,11 @@ best_base(PyObject *bases)
     return base;
 }
 
+#define ADDED_FIELD_AT_OFFSET(name, offset) \
+    (type->tp_ ## name  && (base->tp_ ##name == 0) && \
+    type->tp_ ## name + sizeof(PyObject *) == (offset) && \
+    type->tp_flags & Py_TPFLAGS_HEAPTYPE)
+
 static int
 extra_ivars(PyTypeObject *type, PyTypeObject *base)
 {
@@ -2237,10 +2241,18 @@ extra_ivars(PyTypeObject *type, PyTypeObject *base)
         return t_size != b_size ||
             type->tp_itemsize != base->tp_itemsize;
     }
-    if (type->tp_weaklistoffset && base->tp_weaklistoffset == 0 &&
-        type->tp_weaklistoffset + sizeof(PyObject *) == t_size &&
-        type->tp_flags & Py_TPFLAGS_HEAPTYPE)
+    /* Check for __dict__ and __weakrefs__ slots in either order */
+    if (ADDED_FIELD_AT_OFFSET(weaklistoffset, t_size)) {
         t_size -= sizeof(PyObject *);
+    }
+    if ((type->tp_flags & Py_TPFLAGS_MANAGED_DICT) == 0 &&
+        ADDED_FIELD_AT_OFFSET(dictoffset, t_size)) {
+        t_size -= sizeof(PyObject *);
+    }
+    /* Check __weakrefs__ again, in case it precedes __dict__ */
+    if (ADDED_FIELD_AT_OFFSET(weaklistoffset, t_size)) {
+        t_size -= sizeof(PyObject *);
+    }
     return t_size != b_size;
 }
 
@@ -3190,11 +3202,6 @@ type_new_impl(type_new_ctx *ctx)
     // Put the proper slots in place
     fixup_slot_dispatchers(type);
 
-    if (type->tp_flags & Py_TPFLAGS_MANAGED_DICT) {
-        PyHeapTypeObject *et = (PyHeapTypeObject*)type;
-        et->ht_cached_keys = _PyDict_NewKeysForClass();
-    }
-
     if (type_new_set_names(type) < 0) {
         goto error;
     }
@@ -3575,10 +3582,6 @@ PyType_FromModuleAndSpec(PyObject *module, PyType_Spec *spec, PyObject *bases)
 
     if (PyType_Ready(type) < 0)
         goto fail;
-
-    if (type->tp_flags & Py_TPFLAGS_MANAGED_DICT) {
-        res->ht_cached_keys = _PyDict_NewKeysForClass();
-    }
 
     if (type->tp_doc) {
         PyObject *__doc__ = PyUnicode_FromString(_PyType_DocWithoutSignature(type->tp_name, type->tp_doc));
@@ -6397,6 +6400,29 @@ type_ready_set_new(PyTypeObject *type)
     return 0;
 }
 
+static int
+type_ready_managed_dict(PyTypeObject *type)
+{
+    if (!(type->tp_flags & Py_TPFLAGS_MANAGED_DICT)) {
+        return 0;
+    }
+    if (!(type->tp_flags & Py_TPFLAGS_HEAPTYPE)) {
+        PyErr_Format(PyExc_SystemError,
+                     "type %s has the Py_TPFLAGS_MANAGED_DICT flag "
+                     "but not Py_TPFLAGS_HEAPTYPE flag",
+                     type->tp_name);
+        return -1;
+    }
+    PyHeapTypeObject* et = (PyHeapTypeObject*)type;
+    if (et->ht_cached_keys == NULL) {
+        et->ht_cached_keys = _PyDict_NewKeysForClass();
+        if (et->ht_cached_keys == NULL) {
+            PyErr_NoMemory();
+            return -1;
+        }
+    }
+    return 0;
+}
 
 static int
 type_ready_post_checks(PyTypeObject *type)
@@ -6457,6 +6483,9 @@ type_ready(PyTypeObject *type)
     if (type_ready_add_subclasses(type) < 0) {
         return -1;
     }
+    if (type_ready_managed_dict(type) < 0) {
+        return -1;
+    }
     if (type_ready_post_checks(type) < 0) {
         return -1;
     }
@@ -6512,8 +6541,11 @@ add_subclass(PyTypeObject *base, PyTypeObject *type)
     PyObject *subclasses = base->tp_subclasses;
     if (subclasses == NULL) {
         base->tp_subclasses = subclasses = PyDict_New();
-        if (subclasses == NULL)
+        if (subclasses == NULL) {
+            Py_DECREF(key);
+            Py_DECREF(ref);
             return -1;
+        }
     }
     assert(PyDict_CheckExact(subclasses));
 
@@ -7023,7 +7055,7 @@ wrap_descr_get(PyObject *self, PyObject *args, void *wrapped)
         obj = NULL;
     if (type == Py_None)
         type = NULL;
-    if (type == NULL &&obj == NULL) {
+    if (type == NULL && obj == NULL) {
         PyErr_SetString(PyExc_TypeError,
                         "__get__(None, None) is invalid");
         return NULL;
@@ -8041,7 +8073,7 @@ static slotdef slotdefs[] = {
     TPSLOT("__next__", tp_iternext, slot_tp_iternext, wrap_next,
            "__next__($self, /)\n--\n\nImplement next(self)."),
     TPSLOT("__get__", tp_descr_get, slot_tp_descr_get, wrap_descr_get,
-           "__get__($self, instance, owner, /)\n--\n\nReturn an attribute of instance, which is of type owner."),
+           "__get__($self, instance, owner=None, /)\n--\n\nReturn an attribute of instance, which is of type owner."),
     TPSLOT("__set__", tp_descr_set, slot_tp_descr_set, wrap_descr_set,
            "__set__($self, instance, value, /)\n--\n\nSet an attribute of instance to value."),
     TPSLOT("__delete__", tp_descr_set, slot_tp_descr_set,

@@ -6,6 +6,12 @@
 
 **Source code:** :source:`Lib/dis.py`
 
+.. testsetup::
+
+   import dis
+   def myfunc(alist):
+       return len(alist)
+
 --------------
 
 The :mod:`dis` module supports the analysis of CPython :term:`bytecode` by
@@ -24,11 +30,17 @@ interpreter.
       Use 2 bytes for each instruction. Previously the number of bytes varied
       by instruction.
 
+   .. versionchanged:: 3.10
+      The argument of jump, exception handling and loop instructions is now
+      the instruction offset rather than the byte offset.
+
    .. versionchanged:: 3.11
       Some instructions are accompanied by one or more inline cache entries,
       which take the form of :opcode:`CACHE` instructions. These instructions
       are hidden by default, but can be shown by passing ``show_caches=True`` to
-      any :mod:`dis` utility.
+      any :mod:`dis` utility. Furthermore, the interpreter now adapts the
+      bytecode to specialize it for different runtime conditions. The
+      adaptive bytecode can be shown by passing ``adaptive=True``.
 
 
 Example: Given the function :func:`myfunc`::
@@ -37,17 +49,18 @@ Example: Given the function :func:`myfunc`::
        return len(alist)
 
 the following command can be used to display the disassembly of
-:func:`myfunc`::
+:func:`myfunc`:
+
+.. doctest::
 
    >>> dis.dis(myfunc)
-     1           0 RESUME                   0
-
-     2           2 PUSH_NULL
-                 4 LOAD_GLOBAL              1 (NULL + len)
-                 6 LOAD_FAST                0 (alist)
-                 8 PRECALL                  1
-                10 CALL                     1
-                12 RETURN_VALUE
+     2           0 RESUME                   0
+   <BLANKLINE>
+     3           2 LOAD_GLOBAL              1 (NULL + len)
+                14 LOAD_FAST                0 (alist)
+                16 PRECALL                  1
+                20 CALL                     1
+                30 RETURN_VALUE
 
 (The "2" is a line number).
 
@@ -60,8 +73,8 @@ The bytecode analysis API allows pieces of Python code to be wrapped in a
 :class:`Bytecode` object that provides easy access to details of the compiled
 code.
 
-.. class:: Bytecode(x, *, first_line=None, current_offset=None, show_caches=False)
-
+.. class:: Bytecode(x, *, first_line=None, current_offset=None,\
+                    show_caches=False, adaptive=False)
 
    Analyse the bytecode corresponding to a function, generator, asynchronous
    generator, coroutine, method, string of source code, or a code object (as
@@ -79,6 +92,12 @@ code.
    If *current_offset* is not ``None``, it refers to an instruction offset in the
    disassembled code. Setting this means :meth:`.dis` will display a "current
    instruction" marker against the specified opcode.
+
+   If *show_caches* is ``True``, :meth:`.dis` will display inline cache
+   entries used by the interpreter to specialize the bytecode.
+
+   If *adaptive* is ``True``, :meth:`.dis` will display specialized bytecode
+   that may be different from the original bytecode.
 
    .. classmethod:: from_traceback(tb, *, show_caches=False)
 
@@ -107,16 +126,17 @@ code.
       This can now handle coroutine and asynchronous generator objects.
 
    .. versionchanged:: 3.11
-      Added the ``show_caches`` parameter.
+      Added the *show_caches* and *adaptive* parameters.
 
-Example::
+Example:
+
+.. doctest::
 
     >>> bytecode = dis.Bytecode(myfunc)
     >>> for instr in bytecode:
     ...     print(instr.opname)
     ...
     RESUME
-    PUSH_NULL
     LOAD_GLOBAL
     LOAD_FAST
     PRECALL
@@ -162,7 +182,7 @@ operation is being performed, so the intermediate analysis object isn't useful:
       Added *file* parameter.
 
 
-.. function:: dis(x=None, *, file=None, depth=None, show_caches=False)
+.. function:: dis(x=None, *, file=None, depth=None, show_caches=False, adaptive=False)
 
    Disassemble the *x* object.  *x* can denote either a module, a class, a
    method, a function, a generator, an asynchronous generator, a coroutine,
@@ -183,6 +203,12 @@ operation is being performed, so the intermediate analysis object isn't useful:
    The maximal depth of recursion is limited by *depth* unless it is ``None``.
    ``depth=0`` means no recursion.
 
+   If *show_caches* is ``True``, this function will display inline cache
+   entries used by the interpreter to specialize the bytecode.
+
+   If *adaptive* is ``True``, this function will display specialized bytecode
+   that may be different from the original bytecode.
+
    .. versionchanged:: 3.4
       Added *file* parameter.
 
@@ -193,10 +219,10 @@ operation is being performed, so the intermediate analysis object isn't useful:
       This can now handle coroutine and asynchronous generator objects.
 
    .. versionchanged:: 3.11
-      Added the ``show_caches`` parameter.
+      Added the *show_caches* and *adaptive* parameters.
 
 
-.. function:: distb(tb=None, *, file=None, show_caches=False)
+.. function:: distb(tb=None, *, file=None, show_caches=False, adaptive=False)
 
    Disassemble the top-of-stack function of a traceback, using the last
    traceback if none was passed.  The instruction causing the exception is
@@ -209,11 +235,11 @@ operation is being performed, so the intermediate analysis object isn't useful:
       Added *file* parameter.
 
    .. versionchanged:: 3.11
-      Added the ``show_caches`` parameter.
+      Added the *show_caches* and *adaptive* parameters.
 
 
-.. function:: disassemble(code, lasti=-1, *, file=None, show_caches=False)
-              disco(code, lasti=-1, *, file=None, show_caches=False)
+.. function:: disassemble(code, lasti=-1, *, file=None, show_caches=False, adaptive=False)
+              disco(code, lasti=-1, *, file=None, show_caches=False, adaptive=False)
 
    Disassemble a code object, indicating the last instruction if *lasti* was
    provided.  The output is divided in the following columns:
@@ -236,10 +262,10 @@ operation is being performed, so the intermediate analysis object isn't useful:
       Added *file* parameter.
 
    .. versionchanged:: 3.11
-      Added the ``show_caches`` parameter.
+      Added the *show_caches* and *adaptive* parameters.
 
 
-.. function:: get_instructions(x, *, first_line=None, show_caches=False)
+.. function:: get_instructions(x, *, first_line=None, show_caches=False, adaptive=False)
 
    Return an iterator over the instructions in the supplied function, method,
    source code string or code object.
@@ -252,22 +278,26 @@ operation is being performed, so the intermediate analysis object isn't useful:
    source line information (if any) is taken directly from the disassembled code
    object.
 
+   The *show_caches* and *adaptive* parameters work as they do in :func:`dis`.
+
    .. versionadded:: 3.4
 
    .. versionchanged:: 3.11
-      Added the ``show_caches`` parameter.
+      Added the *show_caches* and *adaptive* parameters.
 
 
 .. function:: findlinestarts(code)
 
-   This generator function uses the ``co_firstlineno`` and ``co_lnotab``
-   attributes of the code object *code* to find the offsets which are starts of
+   This generator function uses the ``co_lines`` method
+   of the code object *code* to find the offsets which are starts of
    lines in the source code.  They are generated as ``(offset, lineno)`` pairs.
-   See :source:`Objects/lnotab_notes.txt` for the ``co_lnotab`` format and
-   how to decode it.
 
    .. versionchanged:: 3.6
       Line numbers can be decreasing. Before, they were always increasing.
+
+   .. versionchanged:: 3.10
+      The :pep:`626` ``co_lines`` method is used instead of the ``co_firstlineno``
+      and ``co_lnotab`` attributes of the code object.
 
 
 .. function:: findlabels(code)
@@ -359,7 +389,7 @@ details of bytecode instructions as :class:`Instruction` instances:
 
 .. class:: Positions
 
-   In case the information is not available, some fields might be `None`.
+   In case the information is not available, some fields might be ``None``.
 
    .. data:: lineno
    .. data:: end_lineno
@@ -396,6 +426,24 @@ The Python compiler currently generates the following bytecode instructions.
 .. opcode:: SWAP (i)
 
    Swap TOS with the item at position *i*.
+
+   .. versionadded:: 3.11
+
+
+.. opcode:: CACHE
+
+   Rather than being an actual instruction, this opcode is used to mark extra
+   space for the interpreter to cache useful data directly in the bytecode
+   itself. It is automatically hidden by all ``dis`` utilities, but can be
+   viewed with ``show_caches=True``.
+
+   Logically, this space is part of the preceding instruction. Many opcodes
+   expect to be followed by an exact number of caches, and will instruct the
+   interpreter to skip over them at runtime.
+
+   Populated caches can look like arbitrary instructions, so great care should
+   be taken when reading or modifying raw, adaptive bytecode containing
+   quickened data.
 
    .. versionadded:: 3.11
 
@@ -506,8 +554,8 @@ the original TOS1.
 
 .. opcode:: GET_ANEXT
 
-   Implements ``PUSH(get_awaitable(TOS.__anext__()))``.  See ``GET_AWAITABLE``
-   for details about ``get_awaitable``
+   Pushes ``get_awaitable(TOS.__anext__())`` to the stack.  See
+   ``GET_AWAITABLE`` for details about ``get_awaitable``.
 
    .. versionadded:: 3.5
 
@@ -515,10 +563,9 @@ the original TOS1.
 .. opcode:: END_ASYNC_FOR
 
    Terminates an :keyword:`async for` loop.  Handles an exception raised
-   when awaiting a next item.  If TOS is :exc:`StopAsyncIteration` pop 3
-   values from the stack and restore the exception state using the second
-   of them.  Otherwise re-raise the exception using the value
-   from the stack.  An exception handler block is removed from the block stack.
+   when awaiting a next item. The stack contains the async iterable in
+   TOS1 and the raised exception in TOS. Both are popped.
+   If the exception is not :exc:`StopAsyncIteration`, it is re-raised.
 
    .. versionadded:: 3.8
 
@@ -577,12 +624,6 @@ iterations of the loop.
 
    Pops TOS and yields it from a :term:`generator`.
 
-
-.. opcode:: YIELD_FROM
-
-   Pops TOS and delegates to it as a subiterator from a :term:`generator`.
-
-   .. versionadded:: 3.3
 
 
 .. opcode:: SETUP_ANNOTATIONS
