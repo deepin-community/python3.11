@@ -3,6 +3,7 @@ import builtins
 import dis
 import enum
 import os
+import re
 import sys
 import types
 import unittest
@@ -857,6 +858,36 @@ class AST_Tests(unittest.TestCase):
         check_limit("a", "[0]")
         check_limit("a", "*a")
 
+    def test_null_bytes(self):
+        with self.assertRaises(SyntaxError,
+            msg="source code string cannot contain null bytes"):
+            ast.parse("a\0b")
+
+    def assert_none_check(self, node: type[ast.AST], attr: str, source: str) -> None:
+        with self.subTest(f"{node.__name__}.{attr}"):
+            tree = ast.parse(source)
+            found = 0
+            for child in ast.walk(tree):
+                if isinstance(child, node):
+                    setattr(child, attr, None)
+                    found += 1
+            self.assertEqual(found, 1)
+            e = re.escape(f"field '{attr}' is required for {node.__name__}")
+            with self.assertRaisesRegex(ValueError, f"^{e}$"):
+                compile(tree, "<test>", "exec")
+
+    def test_none_checks(self) -> None:
+        tests = [
+            (ast.alias, "name", "import spam as SPAM"),
+            (ast.arg, "arg", "def spam(SPAM): spam"),
+            (ast.comprehension, "target", "[spam for SPAM in spam]"),
+            (ast.comprehension, "iter", "[spam for spam in SPAM]"),
+            (ast.keyword, "value", "spam(**SPAM)"),
+            (ast.match_case, "pattern", "match spam:\n case SPAM: spam"),
+            (ast.withitem, "context_expr", "with SPAM: spam"),
+        ]
+        for node, attr, source in tests:
+            self.assert_none_check(node, attr, source)
 
 class ASTHelpers_Test(unittest.TestCase):
     maxDiff = None
@@ -1670,6 +1701,7 @@ class ASTValidatorTests(unittest.TestCase):
     def test_nameconstant(self):
         self.expr(ast.NameConstant(4))
 
+    @support.requires_resource('cpu')
     def test_stdlib_validates(self):
         stdlib = os.path.dirname(ast.__file__)
         tests = [fn for fn in os.listdir(stdlib) if fn.endswith(".py")]
@@ -1785,6 +1817,12 @@ class ASTValidatorTests(unittest.TestCase):
             patterns=[],
             kwd_attrs=[],
             kwd_patterns=[ast.MatchStar()]
+        ),
+        ast.MatchClass(
+            constant_true,  # invalid name
+            patterns=[],
+            kwd_attrs=['True'],
+            kwd_patterns=[pattern_1]
         ),
         ast.MatchSequence(
             [

@@ -1,6 +1,3 @@
-# just the gdb debug file
-@PVER@-dbg binary: python-script-but-no-python-dep
-
 # pointless lintian ...
 @PVER@-dbg binary: hardening-no-fortify-functions
 
@@ -8,3 +5,6 @@
 
 # pyexpat.c contains expat error messages that lintian mis-attributes to embedding
 @PVER@-dbg binary: embedded-library
+
+# no, it's not unusual
+@PVER@-dbg binary: unusual-interpreter

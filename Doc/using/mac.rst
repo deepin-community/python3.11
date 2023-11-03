@@ -66,7 +66,7 @@ number of standard Unix command line editors, :program:`vim` and
 :program:`BBEdit` or :program:`TextWrangler` from Bare Bones Software (see
 http://www.barebones.com/products/bbedit/index.html) are good choices, as is
 :program:`TextMate` (see https://macromates.com/). Other editors include
-:program:`Gvim` (https://macvim-dev.github.io/macvim/) and :program:`Aquamacs`
+:program:`Gvim` (https://macvim.org/macvim/) and :program:`Aquamacs`
 (http://aquamacs.org/).
 
 To run your script from the Terminal window you must make sure that
@@ -125,13 +125,9 @@ http://www.hashcollision.org/hkn/python/idle_intro/index.html.
 Installing Additional Python Packages
 =====================================
 
-There are several methods to install additional Python packages:
+This section has moved to the `Python Packaging User Guide`_.
 
-* Packages can be installed via the standard Python distutils mode (``python
-  setup.py install``).
-
-* Many packages can also be installed via the :program:`setuptools` extension
-  or :program:`pip` wrapper, see https://pip.pypa.io/.
+.. _Python Packaging User Guide: https://packaging.python.org/en/latest/tutorials/installing-packages/
 
 
 GUI Programming on the Mac

@@ -59,7 +59,7 @@ The module defines the following user-callable items:
    platforms, it is a file-like object whose :attr:`!file` attribute is the
    underlying true file object.
 
-   The :py:data:`os.O_TMPFILE` flag is used if it is available and works
+   The :py:const:`os.O_TMPFILE` flag is used if it is available and works
    (Linux-specific, requires Linux kernel 3.11 or later).
 
    On platforms that are neither Posix nor Cygwin, TemporaryFile is an alias
@@ -69,7 +69,7 @@ The module defines the following user-callable items:
 
    .. versionchanged:: 3.5
 
-      The :py:data:`os.O_TMPFILE` flag is now used if available.
+      The :py:const:`os.O_TMPFILE` flag is now used if available.
 
    .. versionchanged:: 3.8
       Added *errors* parameter.
@@ -226,7 +226,10 @@ The module defines the following user-callable items:
    The *prefix*, *suffix*, and *dir* arguments are the same as for
    :func:`mkstemp`.
 
-   :func:`mkdtemp` returns the absolute pathname of the new directory.
+   :func:`mkdtemp` returns the absolute pathname of the new directory if *dir*
+   is ``None`` or is an absolute path. If *dir* is a relative path,
+   :func:`mkdtemp` returns a relative path on Python 3.11 and lower. However,
+   on 3.12 it will return an absolute path in all situations.
 
    .. audit-event:: tempfile.mkdtemp fullpath tempfile.mkdtemp
 

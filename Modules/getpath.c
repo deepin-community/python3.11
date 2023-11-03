@@ -347,11 +347,12 @@ getpath_readlines(PyObject *Py_UNUSED(self), PyObject *args)
         return NULL;
     }
     FILE *fp = _Py_wfopen(path, L"rb");
-    PyMem_Free((void *)path);
     if (!fp) {
         PyErr_SetFromErrno(PyExc_OSError);
+        PyMem_Free((void *)path);
         return NULL;
     }
+    PyMem_Free((void *)path);
 
     r = PyList_New(0);
     if (!r) {
@@ -452,7 +453,10 @@ getpath_realpath(PyObject *Py_UNUSED(self) , PyObject *args)
             if (s) {
                 *s = L'\0';
             }
-            path2 = _Py_normpath(_Py_join_relfile(path, resolved), -1);
+            path2 = _Py_join_relfile(path, resolved);
+            if (path2) {
+                path2 = _Py_normpath(path2, -1);
+            }
             PyMem_RawFree((void *)path);
             path = path2;
         }

@@ -1911,6 +1911,7 @@ class HTTPSTest(TestCase):
             h.close()
             self.assertIn('nginx', server_string)
 
+    @support.requires_resource('walltime')
     def test_networked_bad_cert(self):
         # We feed a "CA" cert that is unrelated to the server's cert
         import ssl
@@ -2248,6 +2249,29 @@ class TunnelTests(TestCase):
             self.conn.request('PUT', '/', '')
         lines = output.getvalue().splitlines()
         self.assertIn('header: {}'.format(expected_header), lines)
+
+    def test_tunnel_leak(self):
+        sock = None
+
+        def _create_connection(address, timeout=None, source_address=None):
+            nonlocal sock
+            sock = FakeSocket(
+                'HTTP/1.1 404 NOT FOUND\r\n\r\n',
+                host=address[0],
+                port=address[1],
+            )
+            return sock
+
+        self.conn._create_connection = _create_connection
+        self.conn.set_tunnel('destination.com')
+        exc = None
+        try:
+            self.conn.request('HEAD', '/', '')
+        except OSError as e:
+            # keeping a reference to exc keeps response alive in the traceback
+            exc = e
+        self.assertIsNotNone(exc)
+        self.assertTrue(sock.file_closed)
 
 
 if __name__ == '__main__':

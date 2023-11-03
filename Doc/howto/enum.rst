@@ -371,6 +371,11 @@ below)::
     >>> Color.BLUE == 2
     False
 
+.. warning::
+
+   It is possible to reload modules -- if a reloaded module contains
+   enums, they will be recreated, and the new members may not
+   compare identical/equal to the original members.
 
 Allowed members and attributes of enumerations
 ----------------------------------------------
@@ -417,9 +422,16 @@ enumeration, with the exception of special methods (:meth:`__str__`,
 :meth:`__add__`, etc.), descriptors (methods are also descriptors), and
 variable names listed in :attr:`_ignore_`.
 
-Note:  if your enumeration defines :meth:`__new__` and/or :meth:`__init__` then
+Note:  if your enumeration defines :meth:`__new__` and/or :meth:`__init__`,
 any value(s) given to the enum member will be passed into those methods.
 See `Planet`_ for an example.
+
+.. note::
+
+    The :meth:`__new__` method, if defined, is used during creation of the Enum
+    members; it is then replaced by Enum's :meth:`__new__` which is used after
+    class creation for lookup of existing members.  See :ref:`new-vs-init` for
+    more details.
 
 
 Restricted Enum subclassing
@@ -479,7 +491,16 @@ from that module.
     nested in other classes.
 
 It is possible to modify how enum members are pickled/unpickled by defining
-:meth:`__reduce_ex__` in the enumeration class.
+:meth:`__reduce_ex__` in the enumeration class.  The default method is by-value,
+but enums with complicated values may want to use by-name::
+
+    >>> class MyEnum(Enum):
+    ...     __reduce_ex__ = enum.pickle_by_enum_name
+
+.. note::
+
+    Using by-name for flags is not recommended, as unnamed aliases will
+    not unpickle.
 
 
 Functional API
@@ -832,18 +853,21 @@ Some rules:
 4. When another data type is mixed in, the :attr:`value` attribute is *not the
    same* as the enum member itself, although it is equivalent and will compare
    equal.
-5. %-style formatting:  ``%s`` and ``%r`` call the :class:`Enum` class's
+5. A ``data type`` is a mixin that defines :meth:`__new__`.
+6. %-style formatting:  ``%s`` and ``%r`` call the :class:`Enum` class's
    :meth:`__str__` and :meth:`__repr__` respectively; other codes (such as
    ``%i`` or ``%h`` for IntEnum) treat the enum member as its mixed-in type.
-6. :ref:`Formatted string literals <f-strings>`, :meth:`str.format`,
+7. :ref:`Formatted string literals <f-strings>`, :meth:`str.format`,
    and :func:`format` will use the enum's :meth:`__str__` method.
 
 .. note::
 
    Because :class:`IntEnum`, :class:`IntFlag`, and :class:`StrEnum` are
    designed to be drop-in replacements for existing constants, their
-   :meth:`__str__` method has been reset to their data types
+   :meth:`__str__` method has been reset to their data types'
    :meth:`__str__` method.
+
+.. _new-vs-init:
 
 When to use :meth:`__new__` vs. :meth:`__init__`
 ------------------------------------------------
@@ -876,6 +900,11 @@ want one of them to be the value::
 
     >>> print(Coordinate(3))
     Coordinate.VY
+
+.. warning::
+
+    *Do not* call ``super().__new__()``, as the lookup-only ``__new__`` is the one
+    that is found; instead, use the data type directly.
 
 
 Finer Points
@@ -955,23 +984,11 @@ but remain normal attributes.
 """"""""""""""""""""
 
 Enum members are instances of their enum class, and are normally accessed as
-``EnumClass.member``.  In Python versions ``3.5`` to ``3.10`` you could access
-members from other members -- this practice was discouraged, and in ``3.11``
-:class:`Enum` returns to not allowing it::
-
-    >>> class FieldTypes(Enum):
-    ...     name = 0
-    ...     value = 1
-    ...     size = 2
-    ...
-    >>> FieldTypes.value.size
-    Traceback (most recent call last):
-    ...
-    AttributeError: <enum 'FieldTypes'> member has no attribute 'size'
-
+``EnumClass.member``.  In certain situations, such as writing custom enum
+behavior, being able to access one member directly from another is useful,
+and is supported.
 
 .. versionchanged:: 3.5
-.. versionchanged:: 3.11
 
 
 Creating members that are mixed with other data types
@@ -1312,6 +1329,13 @@ to handle any extra arguments::
     The :meth:`__new__` method, if defined, is used during creation of the Enum
     members; it is then replaced by Enum's :meth:`__new__` which is used after
     class creation for lookup of existing members.
+
+.. warning::
+
+    *Do not* call ``super().__new__()``, as the lookup-only ``__new__`` is the one
+    that is found; instead, use the data type directly -- e.g.::
+
+       obj = int.__new__(cls, value)
 
 
 OrderedEnum

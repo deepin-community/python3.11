@@ -1,7 +1,9 @@
 import codecs
 import contextlib
+import copy
 import io
 import locale
+import pickle
 import sys
 import unittest
 import encodings
@@ -1772,6 +1774,61 @@ class StreamReaderTest(unittest.TestCase):
         f = self.reader(self.stream)
         self.assertEqual(f.readlines(), ['\ud55c\n', '\uae00'])
 
+    def test_copy(self):
+        f = self.reader(Queue(b'\xed\x95\x9c\n\xea\xb8\x80'))
+        with self.assertRaisesRegex(TypeError, 'StreamReader'):
+            copy.copy(f)
+        with self.assertRaisesRegex(TypeError, 'StreamReader'):
+            copy.deepcopy(f)
+
+    def test_pickle(self):
+        for proto in range(pickle.HIGHEST_PROTOCOL + 1):
+            with self.subTest(protocol=proto):
+                f = self.reader(Queue(b'\xed\x95\x9c\n\xea\xb8\x80'))
+                with self.assertRaisesRegex(TypeError, 'StreamReader'):
+                    pickle.dumps(f, proto)
+
+
+class StreamWriterTest(unittest.TestCase):
+
+    def setUp(self):
+        self.writer = codecs.getwriter('utf-8')
+
+    def test_copy(self):
+        f = self.writer(Queue(b''))
+        with self.assertRaisesRegex(TypeError, 'StreamWriter'):
+            copy.copy(f)
+        with self.assertRaisesRegex(TypeError, 'StreamWriter'):
+            copy.deepcopy(f)
+
+    def test_pickle(self):
+        for proto in range(pickle.HIGHEST_PROTOCOL + 1):
+            with self.subTest(protocol=proto):
+                f = self.writer(Queue(b''))
+                with self.assertRaisesRegex(TypeError, 'StreamWriter'):
+                    pickle.dumps(f, proto)
+
+
+class StreamReaderWriterTest(unittest.TestCase):
+
+    def setUp(self):
+        self.reader = codecs.getreader('latin1')
+        self.writer = codecs.getwriter('utf-8')
+
+    def test_copy(self):
+        f = codecs.StreamReaderWriter(Queue(b''), self.reader, self.writer)
+        with self.assertRaisesRegex(TypeError, 'StreamReaderWriter'):
+            copy.copy(f)
+        with self.assertRaisesRegex(TypeError, 'StreamReaderWriter'):
+            copy.deepcopy(f)
+
+    def test_pickle(self):
+        for proto in range(pickle.HIGHEST_PROTOCOL + 1):
+            with self.subTest(protocol=proto):
+                f = codecs.StreamReaderWriter(Queue(b''), self.reader, self.writer)
+                with self.assertRaisesRegex(TypeError, 'StreamReaderWriter'):
+                    pickle.dumps(f, proto)
+
 
 class EncodedFileTest(unittest.TestCase):
 
@@ -2823,15 +2880,16 @@ class TransformCodecTest(unittest.TestCase):
     def test_custom_zlib_error_is_wrapped(self):
         # Check zlib codec gives a good error for malformed input
         msg = "^decoding with 'zlib_codec' codec failed"
-        with self.assertRaisesRegex(Exception, msg) as failure:
+        with self.assertRaises(zlib.error) as failure:
             codecs.decode(b"hello", "zlib_codec")
         self.assertIsInstance(failure.exception.__cause__,
                                                 type(failure.exception))
 
     def test_custom_hex_error_is_wrapped(self):
         # Check hex codec gives a good error for malformed input
+        import binascii
         msg = "^decoding with 'hex_codec' codec failed"
-        with self.assertRaisesRegex(Exception, msg) as failure:
+        with self.assertRaises(binascii.Error) as failure:
             codecs.decode(b"hello", "hex_codec")
         self.assertIsInstance(failure.exception.__cause__,
                                                 type(failure.exception))
@@ -3367,6 +3425,28 @@ class StreamRecoderTest(unittest.TestCase):
         self.assertEqual(sr.readline(), b'1\n')
         self.assertEqual(sr.readline(), b'abc\n')
         self.assertEqual(sr.readline(), b'789\n')
+
+    def test_copy(self):
+        bio = io.BytesIO()
+        codec = codecs.lookup('ascii')
+        sr = codecs.StreamRecoder(bio, codec.encode, codec.decode,
+                                  encodings.ascii.StreamReader, encodings.ascii.StreamWriter)
+
+        with self.assertRaisesRegex(TypeError, 'StreamRecoder'):
+            copy.copy(sr)
+        with self.assertRaisesRegex(TypeError, 'StreamRecoder'):
+            copy.deepcopy(sr)
+
+    def test_pickle(self):
+        q = Queue(b'')
+        codec = codecs.lookup('ascii')
+        sr = codecs.StreamRecoder(q, codec.encode, codec.decode,
+                                  encodings.ascii.StreamReader, encodings.ascii.StreamWriter)
+
+        for proto in range(pickle.HIGHEST_PROTOCOL + 1):
+            with self.subTest(protocol=proto):
+                with self.assertRaisesRegex(TypeError, 'StreamRecoder'):
+                    pickle.dumps(sr, proto)
 
 
 @unittest.skipIf(_testinternalcapi is None, 'need _testinternalcapi module')

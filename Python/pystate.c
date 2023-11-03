@@ -396,11 +396,19 @@ interpreter_clear(PyInterpreterState *interp, PyThreadState *tstate)
         _PyErr_Clear(tstate);
     }
 
+    // Clear the current/main thread state last.
     HEAD_LOCK(runtime);
-    for (PyThreadState *p = interp->threads.head; p != NULL; p = p->next) {
-        PyThreadState_Clear(p);
-    }
+    PyThreadState *p = interp->threads.head;
     HEAD_UNLOCK(runtime);
+    while (p != NULL) {
+        // See https://github.com/python/cpython/issues/102126
+        // Must be called without HEAD_LOCK held as it can deadlock
+        // if any finalizer tries to acquire that lock.
+        PyThreadState_Clear(p);
+        HEAD_LOCK(runtime);
+        p = p->next;
+        HEAD_UNLOCK(runtime);
+    }
 
     Py_CLEAR(interp->audit_hooks);
 
@@ -874,6 +882,10 @@ _PyThreadState_Init(PyThreadState *tstate)
 void
 _PyThreadState_SetCurrent(PyThreadState *tstate)
 {
+    // gh-104690: If Python is being finalized and PyInterpreterState_Delete()
+    // was called, tstate becomes a dangling pointer.
+    assert(_PyThreadState_CheckConsistency(tstate));
+
     _PyGILState_NoteThreadState(&tstate->interp->runtime->gilstate, tstate);
 }
 
@@ -2226,6 +2238,46 @@ _PyThreadState_PopFrame(PyThreadState *tstate, _PyInterpreterFrame * frame)
         assert(tstate->datastack_top >= base);
         tstate->datastack_top = base;
     }
+}
+
+
+#ifndef NDEBUG
+// Check that a Python thread state valid. In practice, this function is used
+// on a Python debug build to check if 'tstate' is a dangling pointer, if the
+// PyThreadState memory has been freed.
+//
+// Usage:
+//
+//     assert(_PyThreadState_CheckConsistency(tstate));
+int
+_PyThreadState_CheckConsistency(PyThreadState *tstate)
+{
+    assert(!_PyMem_IsPtrFreed(tstate));
+    assert(!_PyMem_IsPtrFreed(tstate->interp));
+    return 1;
+}
+#endif
+
+
+// Check if a Python thread must exit immediately, rather than taking the GIL
+// if Py_Finalize() has been called.
+//
+// When this function is called by a daemon thread after Py_Finalize() has been
+// called, the GIL does no longer exist.
+//
+// tstate can be a dangling pointer (point to freed memory): only tstate value
+// is used, the pointer is not deferenced.
+//
+// tstate must be non-NULL.
+int
+_PyThreadState_MustExit(PyThreadState *tstate)
+{
+    /* bpo-39877: Access _PyRuntime directly rather than using
+       tstate->interp->runtime to support calls from Python daemon threads.
+       After Py_Finalize() has been called, tstate can be a dangling pointer:
+       point to PyThreadState freed memory. */
+    PyThreadState *finalizing = _PyRuntimeState_GetFinalizing(&_PyRuntime);
+    return (finalizing != NULL && finalizing != tstate);
 }
 
 

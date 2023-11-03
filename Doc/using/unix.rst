@@ -30,9 +30,9 @@ following links:
       for Debian users
    https://en.opensuse.org/Portal:Packaging
       for OpenSuse users
-   https://docs-old.fedoraproject.org/en-US/Fedora_Draft_Documentation/0.1/html/RPM_Guide/ch-creating-rpms.html
+   https://docs.fedoraproject.org/en-US/package-maintainers/Packaging_Tutorial_GNU_Hello/
       for Fedora users
-   http://www.slackbook.org/html/package-management-making-packages.html
+   https://slackbook.org/html/package-management-making-packages.html
       for Slackware users
 
 
@@ -93,7 +93,7 @@ Python-related paths and files
 ==============================
 
 These are subject to difference depending on local installation conventions;
-:envvar:`prefix` (``${prefix}``) and :envvar:`exec_prefix` (``${exec_prefix}``)
+:option:`prefix <--prefix>` and :option:`exec_prefix <--exec-prefix>`
 are installation-dependent and should be interpreted as for GNU software; they
 may be the same.
 

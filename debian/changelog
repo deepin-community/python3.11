@@ -1,8 +1,62 @@
-python3.11 (3.11.2-6deepin1) unstable; urgency=medium
+python3.11 (3.11.6-3) unstable; urgency=medium
 
-  * Add loong64 support (rebased)
+  * Fix installation of libpython3.11-testsuite.
 
- -- Han Gao <gaohan@iscas.ac.cn>  Tue, 29 Aug 2023 15:03:44 +0800
+ -- Matthias Klose <doko@debian.org>  Sun, 08 Oct 2023 07:06:43 +0200
+
+python3.11 (3.11.6-2) unstable; urgency=medium
+
+  * Fix installation of libpython3.11-testsuite.
+  * Fix some lintian warnings.
+
+ -- Matthias Klose <doko@debian.org>  Fri, 06 Oct 2023 07:26:17 +0200
+
+python3.11 (3.11.6-1) unstable; urgency=medium
+
+  * New upstream release.
+
+ -- Matthias Klose <doko@debian.org>  Wed, 04 Oct 2023 08:53:50 +0200
+
+python3.11 (3.11.5-3) unstable; urgency=medium
+
+  * Add proposed patch to avoid tzdata-legacy, and drop again the
+    dependency on it. See  https://github.com/python/cpython/pull/108533.
+
+ -- Matthias Klose <doko@debian.org>  Tue, 29 Aug 2023 17:31:31 +0200
+
+python3.11 (3.11.5-2) unstable; urgency=medium
+
+  * libpython3.11-stdlib: Also depend on tzdata-legacy. Closes: #1050530.
+  * Add loongarch support. Closes: #1049963.
+
+ -- Matthias Klose <doko@debian.org>  Sat, 26 Aug 2023 20:28:17 +0200
+
+python3.11 (3.11.5-1) unstable; urgency=medium
+
+  * New upstream release.
+    - Address CVE-2023-41105.
+  * libpython3.11-stdlib: Depend on tzdata. Closes: #1037168.
+  * Update symbols files.
+
+ -- Matthias Klose <doko@debian.org>  Fri, 25 Aug 2023 09:43:52 +0200
+
+python3.11 (3.11.4-1) unstable; urgency=medium
+
+  * New upstream release.
+
+ -- Matthias Klose <doko@debian.org>  Wed, 07 Jun 2023 12:13:09 +0200
+
+python3.11 (3.11.3-2) experimental; urgency=medium
+
+  * Update to the 3.11 branch 2023-05-30.
+
+ -- Matthias Klose <doko@debian.org>  Tue, 30 May 2023 14:15:02 +0200
+
+python3.11 (3.11.3-1) experimental; urgency=medium
+
+  * New upstream release.
+
+ -- Matthias Klose <doko@debian.org>  Tue, 11 Apr 2023 10:25:20 +0200
 
 python3.11 (3.11.2-6) unstable; urgency=high
 

@@ -1,6 +1,7 @@
-lib@PVER@-dev binary: python-script-but-no-python-dep
-
 lib@PVER@-dev binary: arch-dependent-file-not-in-arch-specific-directory
+
+# no, it's not unusual
+lib@PVER@-dev binary: unusual-interpreter
 
 # lintian needs an update for 3.8
 lib@PVER@-dev binary: package-contains-python-header-in-incorrect-directory

@@ -38,5 +38,5 @@ sphinx3.diff
 destshared-location.diff
 fix-py_compile.diff
 ntpath-import.diff
-shutdown-deadlock.diff
-add-loong64-support.patch
+add-loongarch-support.diff
+108533.diff

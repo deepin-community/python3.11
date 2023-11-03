@@ -1,5 +1,5 @@
-# intentional
-lib@PVER@-minimal binary: python-script-but-no-python-dep
+# no, it's not unusual
+lib@PVER@-minimal binary: unusual-interpreter
 
 # lintian omission, multiarch string is encoded in the filename
 lib@PVER@-minimal binary: arch-dependent-file-not-in-arch-specific-directory

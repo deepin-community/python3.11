@@ -430,9 +430,6 @@ formatfloat(PyObject *v, int flags, int prec, int type,
     if (flags & F_ALT) {
         dtoa_flags |= Py_DTSF_ALT;
     }
-    if (flags & F_NO_NEG_0) {
-        dtoa_flags |= Py_DTSF_NO_NEG_0;
-    }
     p = PyOS_double_to_string(x, type, prec, dtoa_flags, NULL);
 
     if (p == NULL)
@@ -714,7 +711,6 @@ _PyBytes_FormatEx(const char *format, Py_ssize_t format_len,
                 case ' ': flags |= F_BLANK; continue;
                 case '#': flags |= F_ALT; continue;
                 case '0': flags |= F_ZERO; continue;
-                case 'z': flags |= F_NO_NEG_0; continue;
                 }
                 break;
             }
@@ -1287,8 +1283,25 @@ _PyBytes_Find(const char *haystack, Py_ssize_t len_haystack,
               const char *needle, Py_ssize_t len_needle,
               Py_ssize_t offset)
 {
-    return stringlib_find(haystack, len_haystack,
-                          needle, len_needle, offset);
+    assert(len_haystack >= 0);
+    assert(len_needle >= 0);
+    // Extra checks because stringlib_find accesses haystack[len_haystack].
+    if (len_needle == 0) {
+        return offset;
+    }
+    if (len_needle > len_haystack) {
+        return -1;
+    }
+    assert(len_haystack >= 1);
+    Py_ssize_t res = stringlib_find(haystack, len_haystack - 1,
+                                    needle, len_needle, offset);
+    if (res == -1) {
+        Py_ssize_t last_align = len_haystack - len_needle;
+        if (memcmp(haystack + last_align, needle, len_needle) == 0) {
+            return offset + last_align;
+        }
+    }
+    return res;
 }
 
 Py_ssize_t
@@ -3191,11 +3204,16 @@ PyDoc_STRVAR(length_hint_doc,
 static PyObject *
 striter_reduce(striterobject *it, PyObject *Py_UNUSED(ignored))
 {
+    PyObject *iter = _PyEval_GetBuiltin(&_Py_ID(iter));
+
+    /* _PyEval_GetBuiltin can invoke arbitrary code,
+     * call must be before access of iterator pointers.
+     * see issue #101765 */
+
     if (it->it_seq != NULL) {
-        return Py_BuildValue("N(O)n", _PyEval_GetBuiltin(&_Py_ID(iter)),
-                             it->it_seq, it->it_index);
+        return Py_BuildValue("N(O)n", iter, it->it_seq, it->it_index);
     } else {
-        return Py_BuildValue("N(())", _PyEval_GetBuiltin(&_Py_ID(iter)));
+        return Py_BuildValue("N(())", iter);
     }
 }
 
