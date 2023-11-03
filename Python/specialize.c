@@ -1238,6 +1238,10 @@ _Py_Specialize_BinarySubscr(
             SPECIALIZATION_FAIL(BINARY_SUBSCR, SPEC_FAIL_OUT_OF_VERSIONS);
             goto fail;
         }
+        if (_PyInterpreterState_GET()->eval_frame) {
+            SPECIALIZATION_FAIL(BINARY_SUBSCR, SPEC_FAIL_OTHER);
+            goto fail;
+        }
         cache->func_version = version;
         ((PyHeapTypeObject *)container_type)->_spec_cache.getitem = descriptor;
         _Py_SET_OPCODE(*instr, BINARY_SUBSCR_GETITEM);
@@ -1496,9 +1500,9 @@ specialize_py_call(PyFunctionObject *func, _Py_CODEUNIT *instr, int nargs,
     }
     int argcount = code->co_argcount;
     int defcount = func->func_defaults == NULL ? 0 : (int)PyTuple_GET_SIZE(func->func_defaults);
-    assert(defcount <= argcount);
     int min_args = argcount-defcount;
-    if (nargs > argcount || nargs < min_args) {
+    // GH-105840: min_args is negative when somebody sets too many __defaults__!
+    if (min_args < 0 || nargs > argcount || nargs < min_args) {
         SPECIALIZATION_FAIL(CALL, SPEC_FAIL_WRONG_NUMBER_ARGUMENTS);
         return -1;
     }

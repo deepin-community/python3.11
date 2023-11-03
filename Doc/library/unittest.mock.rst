@@ -406,7 +406,7 @@ the *new_callable* argument to :func:`patch`.
             False
 
         .. versionchanged:: 3.6
-           Added two keyword only argument to the reset_mock function.
+           Added two keyword-only arguments to the reset_mock function.
 
         This can be useful where you want to make a series of assertions that
         reuse the same object. Note that :meth:`reset_mock` *doesn't* clear the
@@ -416,8 +416,8 @@ the *new_callable* argument to :func:`patch`.
         parameter as ``True``. Child mocks and the return value mock
         (if any) are reset as well.
 
-        .. note:: *return_value*, and :attr:`side_effect` are keyword only
-                  argument.
+        .. note:: *return_value*, and :attr:`side_effect` are keyword-only
+                  arguments.
 
 
     .. method:: mock_add_spec(spec, spec_set=False)
@@ -2436,7 +2436,7 @@ behaviour you can switch it off by setting the module level switch
 
 Alternatively you can just use ``vars(my_mock)`` (instance members) and
 ``dir(type(my_mock))`` (type members) to bypass the filtering irrespective of
-:data:`mock.FILTER_DIR`.
+:const:`mock.FILTER_DIR`.
 
 
 mock_open

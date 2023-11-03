@@ -569,8 +569,8 @@ the original TOS1.
 
    .. versionadded:: 3.8
 
-    .. versionchanged:: 3.11
-       Exception representation on the stack now consist of one, not three, items.
+   .. versionchanged:: 3.11
+      Exception representation on the stack now consist of one, not three, items.
 
 .. opcode:: BEFORE_ASYNC_WITH
 
@@ -747,7 +747,7 @@ iterations of the loop.
 .. opcode:: MATCH_MAPPING
 
    If TOS is an instance of :class:`collections.abc.Mapping` (or, more technically: if
-   it has the :const:`Py_TPFLAGS_MAPPING` flag set in its
+   it has the :c:macro:`Py_TPFLAGS_MAPPING` flag set in its
    :c:member:`~PyTypeObject.tp_flags`), push ``True`` onto the stack.  Otherwise, push
    ``False``.
 
@@ -758,7 +758,7 @@ iterations of the loop.
 
    If TOS is an instance of :class:`collections.abc.Sequence` and is *not* an instance
    of :class:`str`/:class:`bytes`/:class:`bytearray` (or, more technically: if it has
-   the :const:`Py_TPFLAGS_SEQUENCE` flag set in its :c:member:`~PyTypeObject.tp_flags`),
+   the :c:macro:`Py_TPFLAGS_SEQUENCE` flag set in its :c:member:`~PyTypeObject.tp_flags`),
    push ``True`` onto the stack.  Otherwise, push ``False``.
 
    .. versionadded:: 3.10
@@ -1088,7 +1088,7 @@ iterations of the loop.
 
 .. opcode:: MAKE_CELL (i)
 
-   Creates a new cell in slot ``i``.  If that slot is empty then
+   Creates a new cell in slot ``i``.  If that slot is nonempty then
    that value is stored into the new cell.
 
    .. versionadded:: 3.11
@@ -1260,15 +1260,18 @@ iterations of the loop.
    * ``0x02`` a dictionary of keyword-only parameters' default values
    * ``0x04`` a tuple of strings containing parameters' annotations
    * ``0x08`` a tuple containing cells for free variables, making a closure
-   * the code associated with the function (at TOS1)
-   * the :term:`qualified name` of the function (at TOS)
+   * the code associated with the function (at TOS)
 
    .. versionchanged:: 3.10
       Flag value ``0x04`` is a tuple of strings instead of dictionary
 
+   .. versionchanged:: 3.11
+      Qualified name at TOS was removed.
+
+
 .. opcode:: BUILD_SLICE (argc)
 
-   .. index:: builtin: slice
+   .. index:: pair: built-in function; slice
 
    Pushes a slice object on the stack.  *argc* must be 2 or 3.  If it is 2,
    ``slice(TOS1, TOS)`` is pushed; if it is 3, ``slice(TOS2, TOS1, TOS)`` is

@@ -215,7 +215,7 @@ using the :func:`create_archive` function::
    >>> import zipapp
    >>> zipapp.create_archive('old_archive.pyz', 'new_archive.pyz', '/usr/bin/python3')
 
-To update the file in place, do the replacement in memory using a :class:`BytesIO`
+To update the file in place, do the replacement in memory using a :class:`~io.BytesIO`
 object, and then overwrite the source afterwards.  Note that there is a risk
 when overwriting a file in place that an error will result in the loss of
 the original file.  This code does not protect against such errors, but
@@ -281,12 +281,7 @@ The steps to create a standalone archive are as follows:
    file - if not, you can just list the dependencies manually on the pip command
    line).
 
-3. Optionally, delete the ``.dist-info`` directories created by pip in the
-   ``myapp`` directory. These hold metadata for pip to manage the packages, and
-   as you won't be making any further use of pip they aren't required -
-   although it won't do any harm if you leave them.
-
-4. Package the application using:
+3. Package the application using:
 
    .. code-block:: shell-session
 

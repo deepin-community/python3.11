@@ -227,7 +227,9 @@ See also the :ref:`formatspec` section.
 
 The *field_name* itself begins with an *arg_name* that is either a number or a
 keyword.  If it's a number, it refers to a positional argument, and if it's a keyword,
-it refers to a named keyword argument.  If the numerical arg_names in a format string
+it refers to a named keyword argument. An *arg_name* is treated as a number if
+a call to :meth:`str.isdecimal` on the string would return true.
+If the numerical arg_names in a format string
 are 0, 1, 2, ... in sequence, they can all be omitted (not just some)
 and the numbers 0, 1, 2, ... will be automatically inserted in that order.
 Because *arg_name* is not quote-delimited, it is not possible to specify arbitrary
@@ -310,7 +312,7 @@ non-empty format specification typically modifies the result.
 The general form of a *standard format specifier* is:
 
 .. productionlist:: format-spec
-   format_spec: [[`fill`]`align`][`sign`][z][#][0][`width`][`grouping_option`][.`precision`][`type`]
+   format_spec: [[`fill`]`align`][`sign`]["z"]["#"]["0"][`width`][`grouping_option`]["." `precision`][`type`]
    fill: <any character>
    align: "<" | ">" | "=" | "^"
    sign: "+" | "-" | " "

@@ -950,10 +950,6 @@ call_trampoline(PyThreadState *tstate, PyObject* callback,
     PyObject *result = _PyObject_FastCallTstate(tstate, callback, stack, 3);
 
     PyFrame_LocalsToFast(frame, 1);
-    if (result == NULL) {
-        PyTraceBack_Here(frame);
-    }
-
     return result;
 }
 
@@ -2364,15 +2360,21 @@ _PySys_AddXOptionWithError(const wchar_t *s)
     const wchar_t *name_end = wcschr(s, L'=');
     if (!name_end) {
         name = PyUnicode_FromWideChar(s, -1);
+        if (name == NULL) {
+            goto error;
+        }
         value = Py_True;
         Py_INCREF(value);
     }
     else {
         name = PyUnicode_FromWideChar(s, name_end - s);
+        if (name == NULL) {
+            goto error;
+        }
         value = PyUnicode_FromWideChar(name_end + 1, -1);
-    }
-    if (name == NULL || value == NULL) {
-        goto error;
+        if (value == NULL) {
+            goto error;
+        }
     }
     if (PyDict_SetItem(opts, name, value) < 0) {
         goto error;
@@ -3018,20 +3020,26 @@ err_occurred:
 static int
 sys_add_xoption(PyObject *opts, const wchar_t *s)
 {
-    PyObject *name, *value;
+    PyObject *name, *value = NULL;
 
     const wchar_t *name_end = wcschr(s, L'=');
     if (!name_end) {
         name = PyUnicode_FromWideChar(s, -1);
+        if (name == NULL) {
+            goto error;
+        }
         value = Py_True;
         Py_INCREF(value);
     }
     else {
         name = PyUnicode_FromWideChar(s, name_end - s);
+        if (name == NULL) {
+            goto error;
+        }
         value = PyUnicode_FromWideChar(name_end + 1, -1);
-    }
-    if (name == NULL || value == NULL) {
-        goto error;
+        if (value == NULL) {
+            goto error;
+        }
     }
     if (PyDict_SetItem(opts, name, value) < 0) {
         goto error;
@@ -3105,7 +3113,9 @@ _PySys_UpdateConfig(PyThreadState *tstate)
     if (config->pycache_prefix != NULL) {
         SET_SYS_FROM_WSTR("pycache_prefix", config->pycache_prefix);
     } else {
-        PyDict_SetItemString(sysdict, "pycache_prefix", Py_None);
+        if (PyDict_SetItemString(sysdict, "pycache_prefix", Py_None) < 0) {
+            return -1;
+        }
     }
 
     COPY_LIST("argv", config->argv);
@@ -3119,7 +3129,9 @@ _PySys_UpdateConfig(PyThreadState *tstate)
         SET_SYS_FROM_WSTR("_stdlib_dir", stdlibdir);
     }
     else {
-        PyDict_SetItemString(sysdict, "_stdlib_dir", Py_None);
+        if (PyDict_SetItemString(sysdict, "_stdlib_dir", Py_None) < 0) {
+            return -1;
+        }
     }
 
 #undef SET_SYS_FROM_WSTR
@@ -3129,6 +3141,9 @@ _PySys_UpdateConfig(PyThreadState *tstate)
     // sys.flags
     PyObject *flags = _PySys_GetObject(interp, "flags"); // borrowed ref
     if (flags == NULL) {
+        if (!_PyErr_Occurred(tstate)) {
+            _PyErr_SetString(tstate, PyExc_RuntimeError, "lost sys.flags");
+        }
         return -1;
     }
     if (set_flags_from_config(interp, flags) < 0) {

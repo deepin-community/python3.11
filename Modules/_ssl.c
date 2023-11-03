@@ -650,6 +650,10 @@ PySSL_SetError(PySSLSocket *sslsock, int ret, const char *filename, int lineno)
                     errstr = "Some I/O error occurred";
                 }
             } else {
+                if (ERR_GET_LIB(e) == ERR_LIB_SSL &&
+                        ERR_GET_REASON(e) == SSL_R_CERTIFICATE_VERIFY_FAILED) {
+                    type = state->PySSLCertVerificationErrorObject;
+                }
                 p = PY_SSL_ERROR_SYSCALL;
             }
             break;
@@ -665,6 +669,16 @@ PySSL_SetError(PySSLSocket *sslsock, int ret, const char *filename, int lineno)
                     ERR_GET_REASON(e) == SSL_R_CERTIFICATE_VERIFY_FAILED) {
                 type = state->PySSLCertVerificationErrorObject;
             }
+#if defined(SSL_R_UNEXPECTED_EOF_WHILE_READING)
+            /* OpenSSL 3.0 changed transport EOF from SSL_ERROR_SYSCALL with
+             * zero return value to SSL_ERROR_SSL with a special error code. */
+            if (ERR_GET_LIB(e) == ERR_LIB_SSL &&
+                    ERR_GET_REASON(e) == SSL_R_UNEXPECTED_EOF_WHILE_READING) {
+                p = PY_SSL_ERROR_EOF;
+                type = state->PySSLEOFErrorObject;
+                errstr = "EOF occurred in violation of protocol";
+            }
+#endif
             break;
         }
         default:
@@ -2000,24 +2014,44 @@ static PyObject *
 _ssl__SSLSocket_shared_ciphers_impl(PySSLSocket *self)
 /*[clinic end generated code: output=3d174ead2e42c4fd input=0bfe149da8fe6306]*/
 {
-    STACK_OF(SSL_CIPHER) *ciphers;
-    int i;
+    STACK_OF(SSL_CIPHER) *server_ciphers;
+    STACK_OF(SSL_CIPHER) *client_ciphers;
+    int i, len;
     PyObject *res;
+    const SSL_CIPHER* cipher;
 
-    ciphers = SSL_get_ciphers(self->ssl);
-    if (!ciphers)
+    /* Rather than use SSL_get_shared_ciphers, we use an equivalent algorithm because:
+
+       1) It returns a colon seperated list of strings, in an undefined
+          order, that we would have to post process back into tuples.
+       2) It will return a truncated string with no indication that it has
+          done so, if the buffer is too small.
+     */
+
+    server_ciphers = SSL_get_ciphers(self->ssl);
+    if (!server_ciphers)
         Py_RETURN_NONE;
-    res = PyList_New(sk_SSL_CIPHER_num(ciphers));
+    client_ciphers = SSL_get_client_ciphers(self->ssl);
+    if (!client_ciphers)
+        Py_RETURN_NONE;
+
+    res = PyList_New(sk_SSL_CIPHER_num(server_ciphers));
     if (!res)
         return NULL;
-    for (i = 0; i < sk_SSL_CIPHER_num(ciphers); i++) {
-        PyObject *tup = cipher_to_tuple(sk_SSL_CIPHER_value(ciphers, i));
+    len = 0;
+    for (i = 0; i < sk_SSL_CIPHER_num(server_ciphers); i++) {
+        cipher = sk_SSL_CIPHER_value(server_ciphers, i);
+        if (sk_SSL_CIPHER_find(client_ciphers, cipher) < 0)
+            continue;
+
+        PyObject *tup = cipher_to_tuple(cipher);
         if (!tup) {
             Py_DECREF(res);
             return NULL;
         }
-        PyList_SET_ITEM(res, i, tup);
+        PyList_SET_ITEM(res, len++, tup);
     }
+    Py_SET_SIZE(res, len);
     return res;
 }
 
@@ -2770,7 +2804,7 @@ _ssl_session_dup(SSL_SESSION *session) {
     /* get length */
     slen = i2d_SSL_SESSION(session, NULL);
     if (slen == 0 || slen > 0xFF00) {
-        PyErr_SetString(PyExc_ValueError, "i2d() failed.");
+        PyErr_SetString(PyExc_ValueError, "i2d() failed");
         goto error;
     }
     if ((senc = PyMem_Malloc(slen)) == NULL) {
@@ -2779,12 +2813,13 @@ _ssl_session_dup(SSL_SESSION *session) {
     }
     p = senc;
     if (!i2d_SSL_SESSION(session, &p)) {
-        PyErr_SetString(PyExc_ValueError, "i2d() failed.");
+        PyErr_SetString(PyExc_ValueError, "i2d() failed");
         goto error;
     }
     const_p = senc;
     newsession = d2i_SSL_SESSION(NULL, &const_p, slen);
-    if (session == NULL) {
+    if (newsession == NULL) {
+        PyErr_SetString(PyExc_ValueError, "d2i() failed");
         goto error;
     }
     PyMem_Free(senc);
@@ -3113,10 +3148,6 @@ _ssl__SSLContext_impl(PyTypeObject *type, int proto_version)
 #endif
 #ifdef SSL_OP_SINGLE_ECDH_USE
     options |= SSL_OP_SINGLE_ECDH_USE;
-#endif
-#ifdef SSL_OP_IGNORE_UNEXPECTED_EOF
-    /* Make OpenSSL 3.0.0 behave like 1.1.1 */
-    options |= SSL_OP_IGNORE_UNEXPECTED_EOF;
 #endif
     SSL_CTX_set_options(self->ctx, options);
 
@@ -3867,8 +3898,8 @@ _ssl__SSLContext_load_cert_chain_impl(PySSLContext *self, PyObject *certfile,
             /* the password callback has already set the error information */
         }
         else if (errno != 0) {
-            ERR_clear_error();
             PyErr_SetFromErrno(PyExc_OSError);
+            ERR_clear_error();
         }
         else {
             _setSSLError(get_state_ctx(self), NULL, 0, __FILE__, __LINE__);
@@ -3888,8 +3919,8 @@ _ssl__SSLContext_load_cert_chain_impl(PySSLContext *self, PyObject *certfile,
             /* the password callback has already set the error information */
         }
         else if (errno != 0) {
-            ERR_clear_error();
             PyErr_SetFromErrno(PyExc_OSError);
+            ERR_clear_error();
         }
         else {
             _setSSLError(get_state_ctx(self), NULL, 0, __FILE__, __LINE__);
@@ -4116,8 +4147,8 @@ _ssl__SSLContext_load_verify_locations_impl(PySSLContext *self,
         PySSL_END_ALLOW_THREADS
         if (r != 1) {
             if (errno != 0) {
-                ERR_clear_error();
                 PyErr_SetFromErrno(PyExc_OSError);
+                ERR_clear_error();
             }
             else {
                 _setSSLError(get_state_ctx(self), NULL, 0, __FILE__, __LINE__);
@@ -4164,8 +4195,8 @@ _ssl__SSLContext_load_dh_params(PySSLContext *self, PyObject *filepath)
     PySSL_END_ALLOW_THREADS
     if (dh == NULL) {
         if (errno != 0) {
-            ERR_clear_error();
             PyErr_SetFromErrnoWithFilenameObject(PyExc_OSError, filepath);
+            ERR_clear_error();
         }
         else {
             _setSSLError(get_state_ctx(self), NULL, 0, __FILE__, __LINE__);
@@ -4329,8 +4360,6 @@ _ssl__SSLContext_set_ecdh_curve(PySSLContext *self, PyObject *name)
 {
     PyObject *name_bytes;
     int nid;
-    EC_KEY *key;
-
     if (!PyUnicode_FSConverter(name, &name_bytes))
         return NULL;
     assert(PyBytes_Check(name_bytes));
@@ -4341,13 +4370,20 @@ _ssl__SSLContext_set_ecdh_curve(PySSLContext *self, PyObject *name)
                      "unknown elliptic curve name %R", name);
         return NULL;
     }
-    key = EC_KEY_new_by_curve_name(nid);
+#if OPENSSL_VERSION_MAJOR < 3
+    EC_KEY *key = EC_KEY_new_by_curve_name(nid);
     if (key == NULL) {
         _setSSLError(get_state_ctx(self), NULL, 0, __FILE__, __LINE__);
         return NULL;
     }
     SSL_CTX_set_tmp_ecdh(self->ctx, key);
     EC_KEY_free(key);
+#else
+    if (!SSL_CTX_set1_groups(self->ctx, &nid, 1)) {
+        _setSSLError(get_state_ctx(self), NULL, 0, __FILE__, __LINE__);
+        return NULL;
+    }
+#endif
     Py_RETURN_NONE;
 }
 
@@ -6021,17 +6057,26 @@ sslmodule_init_errorcodes(PyObject *module)
 
     errcode = error_codes;
     while (errcode->mnemonic != NULL) {
-        PyObject *mnemo, *key;
-        mnemo = PyUnicode_FromString(errcode->mnemonic);
-        key = Py_BuildValue("ii", errcode->library, errcode->reason);
-        if (mnemo == NULL || key == NULL)
+        PyObject *mnemo = PyUnicode_FromString(errcode->mnemonic);
+        if (mnemo == NULL) {
             return -1;
-        if (PyDict_SetItem(state->err_codes_to_names, key, mnemo))
+        }
+        PyObject *key = Py_BuildValue("ii", errcode->library, errcode->reason);
+        if (key == NULL) {
+            Py_DECREF(mnemo);
             return -1;
-        if (PyDict_SetItem(state->err_names_to_codes, mnemo, key))
+        }
+        if (PyDict_SetItem(state->err_codes_to_names, key, mnemo) < 0) {
+            Py_DECREF(key);
+            Py_DECREF(mnemo);
             return -1;
+        }
+        int rc = PyDict_SetItem(state->err_names_to_codes, mnemo, key);
         Py_DECREF(key);
         Py_DECREF(mnemo);
+        if (rc < 0) {
+            return -1;
+        }
         errcode++;
     }
 
@@ -6089,22 +6134,22 @@ sslmodule_init_versioninfo(PyObject *m)
     */
     libver = OpenSSL_version_num();
     r = PyLong_FromUnsignedLong(libver);
-    if (r == NULL || PyModule_AddObject(m, "OPENSSL_VERSION_NUMBER", r))
+    if (_PyModule_Add(m, "OPENSSL_VERSION_NUMBER", r) < 0)
         return -1;
 
     parse_openssl_version(libver, &major, &minor, &fix, &patch, &status);
     r = Py_BuildValue("IIIII", major, minor, fix, patch, status);
-    if (r == NULL || PyModule_AddObject(m, "OPENSSL_VERSION_INFO", r))
+    if (_PyModule_Add(m, "OPENSSL_VERSION_INFO", r) < 0)
         return -1;
 
     r = PyUnicode_FromString(OpenSSL_version(OPENSSL_VERSION));
-    if (r == NULL || PyModule_AddObject(m, "OPENSSL_VERSION", r))
+    if (_PyModule_Add(m, "OPENSSL_VERSION", r) < 0)
         return -1;
 
     libver = OPENSSL_VERSION_NUMBER;
     parse_openssl_version(libver, &major, &minor, &fix, &patch, &status);
     r = Py_BuildValue("IIIII", major, minor, fix, patch, status);
-    if (r == NULL || PyModule_AddObject(m, "_OPENSSL_API_VERSION", r))
+    if (_PyModule_Add(m, "_OPENSSL_API_VERSION", r) < 0)
         return -1;
 
     return 0;

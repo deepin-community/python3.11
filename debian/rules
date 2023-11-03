@@ -100,7 +100,7 @@ ifneq (,$(filter valgrind, $(shell dpkg-query --show -f '$${Depends}\n' valgrind
 endif
 
 VER=3.11
-SVER=3.11.0
+SVER=3.11.5
 NVER=3.12
 PVER=python$(VER)
 EXT_VER=$(subst .,,$(VER))
@@ -1123,7 +1123,7 @@ endif
 	: # The test framework into $(p_lbase)
 	$(dh_compat2) dh_movefiles -p$(p_lbase) --sourcedir=$(d) \
 		$(scriptdir)/test/{libregrtest,support} \
-		$(scriptdir)/test/{ann_module,ann_module2,ann_module3}.py \
+		$(scriptdir)/test/typinganndata \
 		$(scriptdir)/test/{regrtest,test_support,__init__,__main__}.py
 
 	: # The complete testsuite into $(p_ltst)
@@ -1600,17 +1600,9 @@ stamps/stamp-patch:
 	  sed -n 's/^# *DP: */  /p' $(patchdir)/$$i; \
 	done >> stamps/pxx
 
-	touch Parser/acceler.c Parser/grammar1.c Parser/listnode.c \
-	  Parser/node.c Parser/parser.c Parser/token.c
-
+	touch Parser/parser.c Parser/token.c
 	touch Objects/obmalloc.c Python/dynamic_annotations.c \
 	  Python/mysnprintf.c Python/pyctype.c
-	@sleep 1
-	touch Grammar/Grammar 
-	@sleep 1
-	touch Include/graminit.h
-	@sleep 1
-	touch Python/graminit.c
 
 	ln -sf site-packages Lib/dist-packages
 

@@ -1321,6 +1321,7 @@
  _PyMem_Strdup@Base @SVER@
  _PyMethodWrapper_Type@Base @SVER@
  _PyModuleSpec_IsInitializing@Base @SVER@
+ _PyModule_Add@Base @SVER@
  _PyModule_Clear@Base @SVER@
  _PyModule_ClearDict@Base @SVER@
  _PyModule_CreateInitialized@Base @SVER@
@@ -1606,6 +1607,7 @@
  _Py_UTF8_Edit_Cost@Base @SVER@
  _Py_Uid_Converter@Base @SVER@
  _Py_UnhandledKeyboardInterrupt@Base @SVER@
+ _Py_UniversalNewlineFgetsWithSize@Base @SVER@
  _Py_VaBuildStack@Base @SVER@
  _Py_VaBuildStack_SizeT@Base @SVER@
  _Py_VaBuildValue_SizeT@Base @SVER@

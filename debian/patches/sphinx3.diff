@@ -6,9 +6,9 @@ Origin: upstream, https://github.com/python/cpython/commit/423e77d6de497931585d1
 
 --- a/Doc/conf.py
 +++ b/Doc/conf.py
-@@ -77,6 +77,10 @@
- # Avoid a warning with Sphinx >= 2.0
- master_doc = 'contents'
+@@ -91,6 +91,10 @@ gettext_additional_targets = [
+     'index',
+ ]
  
 +# Allow to build with Sphinx >= 3.2
 +c_allow_pre_v3 = True
@@ -19,10 +19,10 @@ Origin: upstream, https://github.com/python/cpython/commit/423e77d6de497931585d1
  
 --- a/Doc/Makefile
 +++ b/Doc/Makefile
-@@ -13,7 +13,7 @@
- PAPER        =
+@@ -14,7 +14,7 @@ PAPER        =
  SOURCES      =
  DISTVERSION  = $(shell $(PYTHON) tools/extensions/patchlevel.py)
+ REQUIREMENTS = requirements.txt
 -SPHINXERRORHANDLING = -W
 +#SPHINXERRORHANDLING = -W
  

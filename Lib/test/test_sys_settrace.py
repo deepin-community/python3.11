@@ -41,6 +41,20 @@ async def asynciter(iterable):
     for x in iterable:
         yield x
 
+def clean_asynciter(test):
+    @wraps(test)
+    async def wrapper(*args, **kwargs):
+        cleanups = []
+        def wrapped_asynciter(iterable):
+            it = asynciter(iterable)
+            cleanups.append(it.aclose)
+            return it
+        try:
+            return await test(*args, **kwargs, asynciter=wrapped_asynciter)
+        finally:
+            while cleanups:
+                await cleanups.pop()()
+    return wrapper
 
 # A very basic example.  If this fails, we're in deep trouble.
 def basic():
@@ -1571,6 +1585,61 @@ class TraceTestCase(unittest.TestCase):
 
         self.run_and_compare(func, EXPECTED_EVENTS)
 
+    def test_settrace_error(self):
+
+        raised = False
+        def error_once(frame, event, arg):
+            nonlocal raised
+            if not raised:
+                raised = True
+                raise Exception
+            return error
+
+        try:
+            sys._getframe().f_trace = error_once
+            sys.settrace(error_once)
+            len([])
+        except Exception as ex:
+            count = 0
+            tb = ex.__traceback__
+            while tb:
+                if tb.tb_frame.f_code.co_name == "test_settrace_error":
+                    count += 1
+                tb = tb.tb_next
+            if count == 0:
+                self.fail("Traceback is missing frame")
+            elif count > 1:
+                self.fail("Traceback has frame more than once")
+        else:
+            self.fail("No exception raised")
+        finally:
+            sys.settrace(None)
+
+    @support.cpython_only
+    def test_testcapi_settrace_error(self):
+
+        # Skip this test if the _testcapi module isn't available.
+        _testcapi = import_helper.import_module('_testcapi')
+
+        try:
+            _testcapi.settrace_to_error([])
+            len([])
+        except Exception as ex:
+            count = 0
+            tb = ex.__traceback__
+            while tb:
+                if tb.tb_frame.f_code.co_name == "test_testcapi_settrace_error":
+                    count += 1
+                tb = tb.tb_next
+            if count == 0:
+                self.fail("Traceback is missing frame")
+            elif count > 1:
+                self.fail("Traceback has frame more than once")
+        else:
+            self.fail("No exception raised")
+        finally:
+            sys.settrace(None)
+
     def test_very_large_function(self):
         # There is a separate code path when the number of lines > (1 << 15).
         d = {}
@@ -1813,7 +1882,11 @@ class JumpTestCase(unittest.TestCase):
 
     def run_test(self, func, jumpFrom, jumpTo, expected, error=None,
                  event='line', decorated=False):
-        tracer = JumpTracer(func, jumpFrom, jumpTo, event, decorated)
+        wrapped = func
+        while hasattr(wrapped, '__wrapped__'):
+            wrapped = wrapped.__wrapped__
+
+        tracer = JumpTracer(wrapped, jumpFrom, jumpTo, event, decorated)
         sys.settrace(tracer.trace)
         output = []
         if error is None:
@@ -1826,7 +1899,11 @@ class JumpTestCase(unittest.TestCase):
 
     def run_async_test(self, func, jumpFrom, jumpTo, expected, error=None,
                  event='line', decorated=False):
-        tracer = JumpTracer(func, jumpFrom, jumpTo, event, decorated)
+        wrapped = func
+        while hasattr(wrapped, '__wrapped__'):
+            wrapped = wrapped.__wrapped__
+
+        tracer = JumpTracer(wrapped, jumpFrom, jumpTo, event, decorated)
         sys.settrace(tracer.trace)
         output = []
         if error is None:
@@ -1894,7 +1971,8 @@ class JumpTestCase(unittest.TestCase):
         output.append(7)
 
     @async_jump_test(4, 5, [3, 5])
-    async def test_jump_out_of_async_for_block_forwards(output):
+    @clean_asynciter
+    async def test_jump_out_of_async_for_block_forwards(output, asynciter):
         for i in [1]:
             async for i in asynciter([1, 2]):
                 output.append(3)
@@ -1902,7 +1980,8 @@ class JumpTestCase(unittest.TestCase):
             output.append(5)
 
     @async_jump_test(5, 2, [2, 4, 2, 4, 5, 6])
-    async def test_jump_out_of_async_for_block_backwards(output):
+    @clean_asynciter
+    async def test_jump_out_of_async_for_block_backwards(output, asynciter):
         for i in [1]:
             output.append(2)
             async for i in asynciter([1]):
@@ -2713,6 +2792,7 @@ output.append(4)
         ) = output.append(4) or "Spam"
         output.append(5)
 
+    @support.requires_resource('cpu')
     def test_jump_extended_args_for_iter(self):
         # In addition to failing when extended arg handling is broken, this can
         # also hang for a *very* long time:
