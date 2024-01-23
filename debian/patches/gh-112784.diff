@@ -1,0 +1,14 @@
+diff --git a/Makefile.pre.in b/Makefile.pre.in
+index c61b093fc9399a..41d3f330b33e0b 100644
+--- a/Makefile.pre.in
++++ b/Makefile.pre.in
+@@ -1959,6 +1959,9 @@ TESTSUBDIRS=	ctypes/test \
+ 		test/imghdrdata \
+ 		test/leakers \
+ 		test/libregrtest \
++		test/regrtestdata \
++		test/regrtestdata/import_from_tests \
++		test/regrtestdata/import_from_tests/test_regrtest_b \
+ 		test/sndhdrdata \
+ 		test/subprocessdata \
+ 		test/support \

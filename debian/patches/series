@@ -29,7 +29,6 @@ mangle-fstack-protector.diff
 reproducible-buildinfo.diff
 pydoc-use-pager.diff
 local-doc-references.diff
-doc-build-texinfo.diff
 #build-math-object.diff
 argparse-no-shutil.diff
 sysconfigdata-name.diff
@@ -39,4 +38,5 @@ destshared-location.diff
 fix-py_compile.diff
 ntpath-import.diff
 add-loongarch-support.diff
-108533.diff
+issue108447.diff
+gh-112784.diff
