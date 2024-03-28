@@ -18,8 +18,8 @@
 .. note::
 
    The Python runtime does not enforce function and variable type annotations.
-   They can be used by third party tools such as type checkers, IDEs, linters,
-   etc.
+   They can be used by third party tools such as :term:`type checkers <static type checker>`,
+   IDEs, linters, etc.
 
 --------------
 
@@ -290,7 +290,7 @@ a callable with any arbitrary parameter list would be acceptable:
    x = concat  # Also OK
 
 ``Callable`` cannot express complex signatures such as functions that take a
-variadic number of arguments, :func:`overloaded functions <overload>`, or
+variadic number of arguments, :ref:`overloaded functions <overload>`, or
 functions that have keyword-only parameters. However, these signatures can be
 expressed by defining a :class:`Protocol` class with a
 :meth:`~object.__call__` method:
@@ -1424,7 +1424,7 @@ These can be used as types in annotations. They all support subscription using
    Typing operator to conceptually mark an object as having been unpacked.
 
    For example, using the unpack operator ``*`` on a
-   :class:`type variable tuple <TypeVarTuple>` is equivalent to using ``Unpack``
+   :ref:`type variable tuple <typevartuple>` is equivalent to using ``Unpack``
    to mark the type variable tuple as having been unpacked::
 
       Ts = TypeVarTuple('Ts')
@@ -1478,6 +1478,8 @@ for creating generic types.
               return mapping[key]
           except KeyError:
               return default
+
+.. _typevar:
 
 .. class:: TypeVar(name, *constraints, bound=None, covariant=False, contravariant=False)
 
@@ -1573,9 +1575,11 @@ for creating generic types.
 
       A tuple containing the constraints of the type variable, if any.
 
+.. _typevartuple:
+
 .. class:: TypeVarTuple(name)
 
-   Type variable tuple. A specialized form of :class:`type variable <TypeVar>`
+   Type variable tuple. A specialized form of :ref:`type variable <typevar>`
    that enables *variadic* generics.
 
    Usage::
@@ -1686,7 +1690,7 @@ for creating generic types.
 .. class:: ParamSpec(name, *, bound=None, covariant=False, contravariant=False)
 
    Parameter specification variable.  A specialized version of
-   :class:`type variables <TypeVar>`.
+   :ref:`type variables <typevar>`.
 
    Usage::
 
@@ -1781,7 +1785,7 @@ for creating generic types.
 
    .. doctest::
 
-      >>> from typing import ParamSpec
+      >>> from typing import ParamSpec, get_origin
       >>> P = ParamSpec("P")
       >>> get_origin(P.args) is P
       True
@@ -2319,10 +2323,10 @@ Functions and decorators
 
 .. function:: reveal_type(obj, /)
 
-   Reveal the inferred static type of an expression.
+   Ask a static type checker to reveal the inferred type of an expression.
 
    When a static type checker encounters a call to this function,
-   it emits a diagnostic with the type of the argument. For example::
+   it emits a diagnostic with the inferred type of the argument. For example::
 
       x: int = 1
       reveal_type(x)  # Revealed type is "builtins.int"
@@ -2330,21 +2334,20 @@ Functions and decorators
    This can be useful when you want to debug how your type checker
    handles a particular piece of code.
 
-   The function returns its argument unchanged, which allows using
-   it within an expression::
-
-      x = reveal_type(1)  # Revealed type is "builtins.int"
-
-   Most type checkers support ``reveal_type()`` anywhere, even if the
-   name is not imported from ``typing``. Importing the name from
-   ``typing`` allows your code to run without runtime errors and
-   communicates intent more clearly.
-
-   At runtime, this function prints the runtime type of its argument to stderr
-   and returns it unchanged::
+   At runtime, this function prints the runtime type of its argument to
+   :data:`sys.stderr` and returns the argument unchanged (allowing the call to
+   be used within an expression)::
 
       x = reveal_type(1)  # prints "Runtime type is int"
       print(x)  # prints "1"
+
+   Note that the runtime type may be different from (more or less specific
+   than) the type statically inferred by a type checker.
+
+   Most type checkers support ``reveal_type()`` anywhere, even if the
+   name is not imported from ``typing``. Importing the name from
+   ``typing``, however, allows your code to run without runtime errors and
+   communicates intent more clearly.
 
    .. versionadded:: 3.11
 
@@ -2482,6 +2485,8 @@ Functions and decorators
    See :pep:`681` for more details.
 
    .. versionadded:: 3.11
+
+.. _overload:
 
 .. decorator:: overload
 
