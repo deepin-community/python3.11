@@ -1,3 +1,31 @@
+python3.11 (3.11.8-1) unstable; urgency=medium
+
+  * New upstream release.
+  * Don't build-depend on systemtap-sdt-dev on the Hurd.
+
+ -- Matthias Klose <doko@debian.org>  Wed, 07 Feb 2024 22:52:08 +0100
+
+python3.11 (3.11.7-2) unstable; urgency=medium
+
+  * Pull gh-112784, installing test/regrtestdata, fixing autopkg tests.
+
+ -- Matthias Klose <doko@debian.org>  Fri, 08 Dec 2023 15:22:46 +0100
+
+python3.11 (3.11.7-1) unstable; urgency=medium
+
+  * New upstream release.
+
+  [ Stefano Rivera ]
+  * Depend on netbase in libpython3.11-stdlib. Closes: #1055172.
+
+  [ Matthias Klose ]
+  * Fix more shebangs. See: #1057192.
+  * Remove references to the avr architecture. Closes: #1056760.
+  * Add platform triplets for x86_64 GNU/Hurd (Samuel Thibault).
+    Closes: #1055960.
+
+ -- Matthias Klose <doko@debian.org>  Tue, 05 Dec 2023 08:16:25 +0100
+
 python3.11 (3.11.6-3) unstable; urgency=medium
 
   * Fix installation of libpython3.11-testsuite.

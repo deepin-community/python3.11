@@ -7,7 +7,7 @@ Forwarded: no
 
 --- a/Lib/sysconfig.py
 +++ b/Lib/sysconfig.py
-@@ -493,7 +493,7 @@
+@@ -493,7 +493,7 @@ def _get_sysconfigdata_name():
      multiarch = getattr(sys.implementation, '_multiarch', '')
      return os.environ.get(
          '_PYTHON_SYSCONFIGDATA_NAME',
@@ -18,7 +18,7 @@ Forwarded: no
  
 --- a/Makefile.pre.in
 +++ b/Makefile.pre.in
-@@ -2090,8 +2090,10 @@
+@@ -2145,8 +2145,10 @@ libinstall:	all $(srcdir)/Modules/xxmodu
  			esac; \
  		done; \
  	done
@@ -31,7 +31,7 @@ Forwarded: no
  	$(INSTALL_DATA) $(srcdir)/LICENSE $(DESTDIR)$(LIBDEST)/LICENSE.txt
  	if test -d $(DESTDIR)$(LIBDEST)/distutils/tests; then \
  		$(INSTALL_DATA) $(srcdir)/Modules/xxmodule.c \
-@@ -2250,6 +2252,7 @@
+@@ -2305,6 +2307,7 @@ sharedinstall: all
  		--install-scripts=$(BINDIR) \
  		--install-platlib=$(DESTSHARED) \
  		--root=$(DESTDIR)/
@@ -41,7 +41,7 @@ Forwarded: no
  
 --- a/configure.ac
 +++ b/configure.ac
-@@ -162,7 +162,7 @@
+@@ -162,7 +162,7 @@ AC_ARG_WITH(
      dnl Build Python interpreter is used for regeneration and freezing.
      ac_cv_prog_PYTHON_FOR_REGEN=$with_build_python
      PYTHON_FOR_FREEZE="$with_build_python"
