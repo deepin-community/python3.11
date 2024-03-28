@@ -541,6 +541,11 @@ retained), except that three unescaped quotes in a row terminate the literal.  (
    single: \u; escape sequence
    single: \U; escape sequence
 
+.. _escape-sequences:
+
+Escape sequences
+^^^^^^^^^^^^^^^^
+
 Unless an ``'r'`` or ``'R'`` prefix is present, escape sequences in string and
 bytes literals are interpreted according to rules similar to those used by
 Standard C.  The recognized escape sequences are:
@@ -641,10 +646,10 @@ is more easily recognized as broken.)  It is also important to note that the
 escape sequences only recognized in string literals fall into the category of
 unrecognized escapes for bytes literals.
 
-   .. versionchanged:: 3.6
-      Unrecognized escape sequences produce a :exc:`DeprecationWarning`.  In
-      a future Python version they will be a :exc:`SyntaxWarning` and
-      eventually a :exc:`SyntaxError`.
+.. versionchanged:: 3.6
+   Unrecognized escape sequences produce a :exc:`DeprecationWarning`.  In
+   a future Python version they will be a :exc:`SyntaxWarning` and
+   eventually a :exc:`SyntaxError`.
 
 Even in a raw literal, quotes can be escaped with a backslash, but the
 backslash remains in the result; for example, ``r"\""`` is a valid string
@@ -690,10 +695,12 @@ and formatted string literals may be concatenated with plain string literals.
    single: ! (exclamation); in formatted string literal
    single: : (colon); in formatted string literal
    single: = (equals); for help in debugging using string literals
-.. _f-strings:
 
-Formatted string literals
--------------------------
+.. _f-strings:
+.. _formatted-string-literals:
+
+f-strings
+---------
 
 .. versionadded:: 3.6
 

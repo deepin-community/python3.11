@@ -29,7 +29,7 @@ class ModuleTests(unittest.TestCase):
             self.fail("__name__ = %s" % repr(s))
         except AttributeError:
             pass
-        self.assertEqual(foo.__doc__, ModuleType.__doc__)
+        self.assertEqual(foo.__doc__, ModuleType.__doc__ or '')
 
     def test_uninitialized_missing_getattr(self):
         # Issue 8297
@@ -268,7 +268,7 @@ a = A(destroyed)"""
 
     def test_module_finalization_at_shutdown(self):
         # Module globals and builtins should still be available during shutdown
-        rc, out, err = assert_python_ok("-c", "from test import final_a")
+        rc, out, err = assert_python_ok("-c", "from test.test_module import final_a")
         self.assertFalse(err)
         lines = out.splitlines()
         self.assertEqual(set(lines), {
