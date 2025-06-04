@@ -1,0 +1,65 @@
+diff --git a/Lib/test/test_sysconfig.py b/Lib/test/test_sysconfig.py
+index 0635703..bec6e8a 100644
+--- a/Lib/test/test_sysconfig.py
++++ b/Lib/test/test_sysconfig.py
+@@ -488,7 +488,7 @@ class TestSysConfig(unittest.TestCase):
+         import platform, re
+         machine = platform.machine()
+         suffix = sysconfig.get_config_var('EXT_SUFFIX')
+-        if re.match('(aarch64|arm|mips|ppc|powerpc|s390|sparc)', machine):
++        if re.match('(aarch64|arm|mips|ppc|powerpc|s390|sparc|sw_64)', machine):
+             self.assertTrue('linux' in suffix, suffix)
+         if re.match('(i[3-6]86|x86_64)$', machine):
+             if ctypes.sizeof(ctypes.c_char_p()) == 4:
+diff --git a/config.guess b/config.guess
+index e81d3ae..811b6b8 100755
+--- a/config.guess
++++ b/config.guess
+@@ -1140,6 +1140,9 @@ EOF
+     sparc:Linux:*:* | sparc64:Linux:*:*)
+ 	GUESS=$UNAME_MACHINE-unknown-linux-$LIBC
+ 	;;
++	sw_64:Linux:*:*)
++	GUESS=$UNAME_MACHINE-unknown-linux-$LIBC
++	;;
+     tile*:Linux:*:*)
+ 	GUESS=$UNAME_MACHINE-unknown-linux-$LIBC
+ 	;;
+diff --git a/config.sub b/config.sub
+index d74fb6d..ccd2bbc 100755
+--- a/config.sub
++++ b/config.sub
+@@ -1262,6 +1262,7 @@ case $cpu-$vendor in
+ 			| sparclite \
+ 			| sparcv8 | sparcv9 | sparcv9b | sparcv9v | sv1 | sx* \
+ 			| spu \
++			| sw_64\
+ 			| tahoe \
+ 			| thumbv7* \
+ 			| tic30 | tic4x | tic54x | tic55x | tic6x | tic80 \
+diff --git a/configure b/configure
+index cb3db60..4b7ec9e 100755
+--- a/configure
++++ b/configure
+@@ -6153,6 +6153,8 @@ cat > conftest.c <<EOF
+         riscv32-linux-gnu
+ #  elif __riscv_xlen == 64
+         riscv64-linux-gnu
++# elif defined(__sw_64__)
++        sw_64-linux-gnu
+ #  else
+ #   error unknown platform triplet
+ #  endif
+diff --git a/configure.ac b/configure.ac
+index 331dc99..98391f9 100644
+--- a/configure.ac
++++ b/configure.ac
+@@ -1062,6 +1062,8 @@ cat > conftest.c <<EOF
+ #  else
+ #   error unknown platform triplet
+ #  endif
++# elif defined(__sw_64__)
++        sw_64-linux-gnu
+ # else
+ #   error unknown platform triplet
+ # endif
