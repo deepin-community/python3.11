@@ -39,3 +39,4 @@ fix-py_compile.diff
 ntpath-import.diff
 add-loongarch-support.diff
 issue108447.diff
+0001-deepin-sw_64-support.diff
