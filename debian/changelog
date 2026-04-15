@@ -1,3 +1,11 @@
+python3.11 (3.11.8-1deepin2) unstable; urgency=medium
+
+  * fix: Fix C stack overflow (CVE-2026-4224) in pyexpat.c
+    - Add recursive call check in conv_content_model to prevent crash
+    - Upstream: https://github.com/python/cpython/commit/642865ddf4b232da1f3b1f7abcfa3254c4bfe785
+
+ -- deepin-ci-robot <packages@deepin.org>  Tue, 15 Apr 2026 15:00:00 +0800
+
 python3.11 (3.11.8-1deepin1) unstable; urgency=medium
 
   * feat: add sw64 support.
