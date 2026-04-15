@@ -40,3 +40,4 @@ ntpath-import.diff
 add-loongarch-support.diff
 issue108447.diff
 0001-deepin-sw_64-support.diff
+CVE-2026-4224.patch
