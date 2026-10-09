@@ -41,3 +41,4 @@ add-loongarch-support.diff
 issue108447.diff
 0001-deepin-sw_64-support.diff
 CVE-2026-15308.patch
+CVE-2026-15806.patch

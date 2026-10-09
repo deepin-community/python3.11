@@ -5,6 +5,11 @@ python3.11 (3.11.8-1deepin2) unstable; urgency=medium
     153031) (GH-153039)   Upstream:
     https://github.com/python/cpython/commit/07efb08123ba9367a7107325adb
     9d5626dca1ca9
+  * fix(cve): CVE-2026-15806 (medium) - [3.11] gh-155694: Scope
+    HTTPPasswordMgr credentials by URL scheme (GH-155696) (#155972)
+    Upstream:
+    https://github.com/python/cpython/commit/95355ee3a8e1d3c3d4858d1973a
+    a42a9b91a2801
 
  -- deepin-ci-robot <packages@deepin.org>  Thu, 08 Oct 2026 20:31:44 +0800
 
