@@ -17,6 +17,10 @@ python3.11 (3.11.8-1deepin2) unstable; urgency=medium
   * fix(cve): CVE-2026-19445 (unknown) - [3.11] gh-156293: ssl: do not
     call the servername callback through a released SSLContext
     Upstream: https://github.com/python/cpython/pull/158523.patch
+  * fix(cve): CVE-2026-18503 (low) - [3.11] gh-98820: Fix quadratic time
+    in csv.Sniffer for quoted fields (GH-154867) (#155538)   Upstream:
+    https://github.com/python/cpython/commit/b09a67a20c464f8288c9f9a6b9c
+    7082a74560024
 
  -- deepin-ci-robot <packages@deepin.org>  Thu, 08 Oct 2026 20:31:44 +0800
 
