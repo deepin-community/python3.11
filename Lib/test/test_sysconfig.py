@@ -336,7 +336,7 @@ class TestSysConfig(unittest.TestCase):
         self.assertTrue(os.path.isfile(config_h), config_h)
 
     def test_get_scheme_names(self):
-        wanted = ['nt', 'posix_home', 'posix_prefix', 'posix_venv', 'nt_venv', 'venv']
+        wanted = ['deb_system', 'posix_local', 'nt', 'posix_home', 'posix_prefix', 'posix_venv', 'nt_venv', 'venv']
         if HAS_USER_BASE:
             wanted.extend(['nt_user', 'osx_framework_user', 'posix_user'])
         self.assertEqual(get_scheme_names(), tuple(sorted(wanted)))
@@ -488,7 +488,7 @@ class TestSysConfig(unittest.TestCase):
         import platform, re
         machine = platform.machine()
         suffix = sysconfig.get_config_var('EXT_SUFFIX')
-        if re.match('(aarch64|arm|mips|ppc|powerpc|s390|sparc)', machine):
+        if re.match('(aarch64|arm|mips|ppc|powerpc|s390|sparc|sw_64)', machine):
             self.assertTrue('linux' in suffix, suffix)
         if re.match('(i[3-6]86|x86_64)$', machine):
             if ctypes.sizeof(ctypes.c_char_p()) == 4:

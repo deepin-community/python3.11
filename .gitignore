@@ -1,0 +1,6 @@
+
+# compat_guard 环境产物
+.pc/
+*.rej
+*.orig
+*.patch~

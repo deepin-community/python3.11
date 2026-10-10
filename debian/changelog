@@ -1,3 +1,34 @@
+python3.11 (3.11.8-1deepin2) unstable; urgency=medium
+
+  * fix(cve): CVE-2026-15308 (high) - [PATCH] [3.14] gh-153030: Fix
+    quadratic complexity in incremental parsing in HTMLParser (GH-
+    153031) (GH-153039)   Upstream:
+    https://github.com/python/cpython/commit/07efb08123ba9367a7107325adb
+    9d5626dca1ca9
+  * fix(cve): CVE-2026-15806 (medium) - [3.11] gh-155694: Scope
+    HTTPPasswordMgr credentials by URL scheme (GH-155696) (#155972)
+    Upstream:
+    https://github.com/python/cpython/commit/95355ee3a8e1d3c3d4858d1973a
+    a42a9b91a2801
+  * fix(cve): CVE-2026-19553 (unknown) - [3.11] gh-156793: Validate
+    SSLContext.wrap_bio() parameters like wrap_socket() (GH-158503)
+    (cherry picked from commit 1697ea386c707142555d98a1263176bbbc014a96)
+    Upstream: https://github.com/python/cpython/pull/158516
+  * fix(cve): CVE-2026-19445 (unknown) - [3.11] gh-156293: ssl: do not
+    call the servername callback through a released SSLContext
+    Upstream: https://github.com/python/cpython/pull/158523.patch
+  * fix(cve): CVE-2026-18503 (low) - [3.11] gh-98820: Fix quadratic time
+    in csv.Sniffer for quoted fields (GH-154867) (#155538)   Upstream:
+    https://github.com/python/cpython/commit/b09a67a20c464f8288c9f9a6b9c
+    7082a74560024
+  * fix(cve): CVE-2026-15310 (low) - [3.11] gh-156002: Bound zipfile
+    decompression for bzip2/LZMA/Zstandard (GH-156003) (GH-156362)
+    (#156740)   Upstream:
+    https://github.com/python/cpython/commit/6257029de42ef89b67f3d20137d
+    e87d43e197530.patch
+
+ -- deepin-ci-robot <packages@deepin.org>  Thu, 08 Oct 2026 20:31:44 +0800
+
 python3.11 (3.11.8-1deepin1) unstable; urgency=medium
 
   * feat: add sw64 support.
