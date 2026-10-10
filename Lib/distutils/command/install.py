@@ -10,7 +10,7 @@ import re
 from distutils import log
 from distutils.core import Command
 from distutils.debug import DEBUG
-from distutils.sysconfig import get_config_vars
+from distutils.sysconfig import get_config_vars, is_virtual_environment
 from distutils.errors import DistutilsPlatformError
 from distutils.file_util import write_file
 from distutils.util import convert_path, subst_vars, change_root
@@ -34,6 +34,30 @@ SCHEME_KEYS = ('purelib', 'platlib', 'headers', 'scripts', 'data')
 # Note that this module is deprecated (PEP 632); all consumers
 # of this information should switch to using sysconfig directly.
 INSTALL_SCHEMES = {"unix_prefix": {}, "unix_home": {}, "nt": {}}
+
+# add the Debian install schemes here until they are added to sysconfig
+INSTALL_SCHEMES['unix_local'] = {
+    'stdlib': '{installed_base}/{platlibdir}/python{py_version_short}',
+    'platstdlib': '{platbase}/{platlibdir}/python{py_version_short}',
+    'purelib': '{base}/local/lib/python{py_version_short}/dist-packages',
+    'platlib': '{platbase}/local/{platlibdir}/python{py_version_short}/dist-packages',
+    'include': '{installed_base}/include/python{py_version_short}{abiflags}',
+    'headers': '{base}/local/include/python{py_version_short}{abiflags}',
+    'platinclude': '{installed_platbase}/include/python{py_version_short}{abiflags}',
+    'scripts': '{base}/local/bin',
+    'data': '{base}/local',
+}
+INSTALL_SCHEMES['deb_system'] = {
+    'stdlib': '{installed_base}/{platlibdir}/python{py_version_short}',
+    'platstdlib': '{platbase}/{platlibdir}/python{py_version_short}',
+    'purelib': '{base}/lib/python3/dist-packages',
+    'platlib': '{platbase}/{platlibdir}/python3/dist-packages',
+    'include': '{installed_base}/include/python{py_version_short}{abiflags}',
+    'headers': '{installed_base}/include/python{py_version_short}{abiflags}',
+    'platinclude': '{installed_platbase}/include/python{py_version_short}{abiflags}',
+    'scripts': '{base}/bin',
+    'data': '{base}',
+}
 
 # Copy from sysconfig._INSTALL_SCHEMES
 for key in SCHEME_KEYS:
@@ -148,6 +172,9 @@ class install(Command):
 
         ('record=', None,
          "filename in which to record list of installed files"),
+
+        ('install-layout=', None,
+         "installation layout to choose (known values: deb, unix)"),
         ]
 
     boolean_options = ['compile', 'force', 'skip-build']
@@ -168,6 +195,7 @@ class install(Command):
         self.exec_prefix = None
         self.home = None
         self.user = 0
+        self.prefix_option = None
 
         # These select only the installation base; it's up to the user to
         # specify the installation scheme (currently, that means supplying
@@ -189,6 +217,10 @@ class install(Command):
         if HAS_USER_SITE:
             self.install_userbase = USER_BASE
             self.install_usersite = USER_SITE
+
+        # enable custom installation, known values: deb
+        self.install_layout = None
+        self.multiarch = None
 
         self.compile = None
         self.optimize = None
@@ -436,6 +468,7 @@ class install(Command):
             self.install_base = self.install_platbase = self.home
             self.select_scheme("unix_home")
         else:
+            self.prefix_option = self.prefix
             if self.prefix is None:
                 if self.exec_prefix is not None:
                     raise DistutilsOptionError(
@@ -450,7 +483,25 @@ class install(Command):
 
             self.install_base = self.prefix
             self.install_platbase = self.exec_prefix
-            self.select_scheme("unix_prefix")
+            if self.install_layout:
+                if self.install_layout.lower() in ['deb']:
+                    import sysconfig
+                    self.multiarch = sysconfig.get_config_var('MULTIARCH')
+                    self.select_scheme("deb_system")
+                elif self.install_layout.lower() in ['unix']:
+                    self.select_scheme("unix_prefix")
+                else:
+                    raise DistutilsOptionError(
+                        "unknown value for --install-layout")
+            elif ((self.prefix_option and
+                   os.path.normpath(self.prefix) != '/usr/local')
+                  or is_virtual_environment()):
+                self.select_scheme("unix_prefix")
+            else:
+                if os.path.normpath(self.prefix) == '/usr/local':
+                    self.prefix = self.exec_prefix = '/usr'
+                    self.install_base = self.install_platbase = '/usr'
+                self.select_scheme("unix_local")
 
     def finalize_other(self):
         """Finalizes options for non-posix platforms"""

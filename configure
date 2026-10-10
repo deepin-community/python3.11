@@ -6153,6 +6153,8 @@ cat > conftest.c <<EOF
         riscv32-linux-gnu
 #  elif __riscv_xlen == 64
         riscv64-linux-gnu
+# elif defined(__sw_64__)
+        sw_64-linux-gnu
 #  else
 #   error unknown platform triplet
 #  endif

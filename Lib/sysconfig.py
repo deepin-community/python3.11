@@ -36,6 +36,30 @@ _INSTALL_SCHEMES = {
         'scripts': '{base}/bin',
         'data': '{base}',
         },
+    'deb_system': {
+        'stdlib': '{installed_base}/lib/python{py_version_short}',
+        'platstdlib': '{platbase}/lib/python{py_version_short}',
+        'purelib': '{base}/lib/python3/dist-packages',
+        'platlib': '{platbase}/lib/python3/dist-packages',
+        'include':
+            '{installed_base}/include/python{py_version_short}{abiflags}',
+        'platinclude':
+            '{installed_platbase}/include/python{py_version_short}{abiflags}',
+        'scripts': '{base}/bin',
+        'data': '{base}',
+        },
+    'posix_local': {
+        'stdlib': '{installed_base}/lib/python{py_version_short}',
+        'platstdlib': '{platbase}/lib/python{py_version_short}',
+        'purelib': '{base}/local/lib/python{py_version_short}/dist-packages',
+        'platlib': '{platbase}/local/lib/python{py_version_short}/dist-packages',
+        'include':
+            '{installed_base}/include/python{py_version_short}{abiflags}',
+        'platinclude':
+            '{installed_platbase}/include/python{py_version_short}{abiflags}',
+        'scripts': '{base}/local/bin',
+        'data': '{base}/local',
+        },
     'posix_home': {
         'stdlib': '{installed_base}/lib/python',
         'platstdlib': '{base}/lib/python',
@@ -229,7 +253,7 @@ def is_python_build(check_home=None):
 _PYTHON_BUILD = is_python_build()
 
 if _PYTHON_BUILD:
-    for scheme in ('posix_prefix', 'posix_home'):
+    for scheme in ('posix_prefix', 'posix_home', 'posix_local', 'deb_system'):
         # On POSIX-y platforms, Python will:
         # - Build from .h files in 'headers' (which is only added to the
         #   scheme when building CPython)
@@ -289,8 +313,20 @@ def _get_preferred_schemes():
             'home': 'posix_home',
             'user': 'osx_framework_user',
         }
+
+    if sys.base_prefix != sys.prefix or hasattr(sys, "real_prefix"):
+        # virtual environments
+        prefix_scheme = 'posix_prefix'
+    else:
+        # default to /usr for package builds, /usr/local otherwise
+        deb_build = os.environ.get('DEB_PYTHON_INSTALL_LAYOUT', 'posix_local')
+        if deb_build in ('deb', 'deb_system'):
+            prefix_scheme = 'deb_system'
+        else:
+            prefix_scheme = 'posix_local'
+
     return {
-        'prefix': 'posix_prefix',
+        'prefix': prefix_scheme,
         'home': 'posix_home',
         'user': 'posix_user',
     }
@@ -457,7 +493,7 @@ def _get_sysconfigdata_name():
     multiarch = getattr(sys.implementation, '_multiarch', '')
     return os.environ.get(
         '_PYTHON_SYSCONFIGDATA_NAME',
-        f'_sysconfigdata_{sys.abiflags}_{sys.platform}_{multiarch}',
+        f'_sysconfigdata_{sys.abiflags}_{multiarch}',
     )
 
 
@@ -592,7 +628,7 @@ def get_config_h_filename():
         else:
             inc_dir = _PROJECT_BASE
     else:
-        inc_dir = get_path('platinclude')
+        inc_dir = get_path('platinclude', 'posix_prefix')
     return os.path.join(inc_dir, 'pyconfig.h')
 
 
@@ -673,6 +709,12 @@ def get_config_vars(*args):
             # init function to enable using 'get_config_var' in
             # the init-function.
             _CONFIG_VARS['userbase'] = _getuserbase()
+
+        multiarch = get_config_var('MULTIARCH')
+        if multiarch:
+            _CONFIG_VARS['multiarchsubdir'] = '/' + multiarch
+        else:
+            _CONFIG_VARS['multiarchsubdir'] = ''
 
         # Always convert srcdir to an absolute path
         srcdir = _CONFIG_VARS.get('srcdir', _PROJECT_BASE)
