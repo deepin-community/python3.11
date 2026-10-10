@@ -21,6 +21,11 @@ python3.11 (3.11.8-1deepin2) unstable; urgency=medium
     in csv.Sniffer for quoted fields (GH-154867) (#155538)   Upstream:
     https://github.com/python/cpython/commit/b09a67a20c464f8288c9f9a6b9c
     7082a74560024
+  * fix(cve): CVE-2026-15310 (low) - [3.11] gh-156002: Bound zipfile
+    decompression for bzip2/LZMA/Zstandard (GH-156003) (GH-156362)
+    (#156740)   Upstream:
+    https://github.com/python/cpython/commit/6257029de42ef89b67f3d20137d
+    e87d43e197530.patch
 
  -- deepin-ci-robot <packages@deepin.org>  Thu, 08 Oct 2026 20:31:44 +0800
 
