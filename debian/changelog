@@ -14,6 +14,9 @@ python3.11 (3.11.8-1deepin2) unstable; urgency=medium
     SSLContext.wrap_bio() parameters like wrap_socket() (GH-158503)
     (cherry picked from commit 1697ea386c707142555d98a1263176bbbc014a96)
     Upstream: https://github.com/python/cpython/pull/158516
+  * fix(cve): CVE-2026-19445 (unknown) - [3.11] gh-156293: ssl: do not
+    call the servername callback through a released SSLContext
+    Upstream: https://github.com/python/cpython/pull/158523.patch
 
  -- deepin-ci-robot <packages@deepin.org>  Thu, 08 Oct 2026 20:31:44 +0800
 
